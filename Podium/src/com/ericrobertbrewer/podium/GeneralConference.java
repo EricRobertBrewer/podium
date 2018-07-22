@@ -116,9 +116,9 @@ public class GeneralConference {
         final String title = DriverUtil.getElementTextOrEmpty(contentSection, By.id("title1")).trim();
         // Extract speaker.
         // Leave any leading "By" or "Presented by" as it retains more information.
-        final String speaker = DriverUtil.getElementTextOrEmpty(contentSection, By.className("author-name")).trim();
+        final String speaker = DriverUtil.getElementTextOrEmpty(contentSection, By.id("p1")).trim();
         // Extract speaker's role.
-        final String role = DriverUtil.getElementTextOrEmpty(contentSection, By.className("author-role")).trim();
+        final String role = DriverUtil.getElementTextOrEmpty(contentSection, By.id("p2")).trim();
         // Extract kicker.
         final String kicker = DriverUtil.getElementTextOrEmpty(contentSection, By.id("kicker1")).trim();
         // If this is a talk, create the file to which it will be written.
