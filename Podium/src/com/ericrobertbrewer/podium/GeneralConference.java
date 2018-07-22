@@ -16,9 +16,12 @@ public class GeneralConference {
     private static final String GENERAL_CONFERENCE_HOME_URL = "https://www.lds.org/languages/eng/lib/general-conference";
 
     public static void main(String[] args) throws IOException {
-        System.setProperty("webdriver.chrome.driver", "/Users/brewer/Code/Eric/drivers/chromedriver");
+        if (args.length < 1) {
+            throw new IllegalArgumentException("Usage: <chrome-driver-path>");
+        }
+        System.setProperty("webdriver.chrome.driver", args[0]);
         final WebDriver driver = new ChromeDriver();
-        final File rootFolder = new File("gc" + File.separator);
+        final File rootFolder = new File(Folders.CONTENT_GENERAL_CONFERENCE);
         if (!rootFolder.exists() && !rootFolder.mkdir()) {
             throw new RuntimeException("Unable to create root directory: `" + rootFolder.getPath() + "`.");
         }
