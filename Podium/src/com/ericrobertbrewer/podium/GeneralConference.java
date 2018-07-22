@@ -116,11 +116,22 @@ public class GeneralConference {
         final WebElement contentSection = driver.findElement(By.id("content"));
         // Extract talk (or video/session) title.
         final String title = DriverUtil.getElementTextOrEmpty(contentSection, By.id("title1")).trim();
+        // Extract speaker and role. (Role may not be present on page.)
+        final WebElement byDiv = contentSection.findElement(By.className("byline"));
+        final List<WebElement> byPs = byDiv.findElements(By.tagName("p"));
         // Extract speaker.
         // Leave any leading "By" or "Presented by" as it retains more information.
-        final String speaker = DriverUtil.getElementTextOrEmpty(contentSection, By.id("p1")).trim();
-        // Extract speaker's role.
-        final String role = DriverUtil.getElementTextOrEmpty(contentSection, By.id("p2")).trim();
+        final String speaker = byPs.get(0).getText().trim();
+        // Extract speaker's role, if it is shown.
+        final String role;
+        if (byPs.size() > 1) {
+            role = byPs.get(1).getText().trim();
+        } else {
+            // Role isn't shown on the page. May be prophet/President.
+            // For example, `https://www.lds.org/languages/eng/content/general-conference/2018/04/revelation-for-the-church-revelation-for-our-lives`.
+            // In the above case, the `speaker` starts with `By President `.
+            role = "";
+        }
         // Extract kicker.
         final String kicker = DriverUtil.getElementTextOrEmpty(contentSection, By.id("kicker1")).trim();
         // If this is a talk, create the file to which it will be written.
