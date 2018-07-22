@@ -5,9 +5,6 @@ import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
-import java.io.*;
-import java.util.List;
-
 public class DriverUtil {
 
     public static String getElementTextOrEmpty(WebDriver driver, By by) {
@@ -42,23 +39,5 @@ public class DriverUtil {
         } catch (NoSuchElementException e) {
             return null;
         }
-    }
-
-    public static void writeElements(List<WebElement> elements, File file, TextExtractor extractor) throws IOException {
-        if (!file.createNewFile()) {
-            throw new RuntimeException("Unable to create file: `" + file.getPath() + "`.");
-        }
-        if (!file.canWrite() && !file.setWritable(true)) {
-            throw new RuntimeException("Unable to write to file: `" + file.getPath() + "`.");
-        }
-        // Write each paragraph to the file.
-        final OutputStream outputStream = new FileOutputStream(file);
-        final PrintStream printStream = new PrintStream(outputStream);
-        for (WebElement element : elements) {
-            final String text = extractor.getText(element);
-            printStream.println(text);
-        }
-        printStream.close();
-        outputStream.close();
     }
 }
