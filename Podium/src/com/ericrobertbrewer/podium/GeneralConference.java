@@ -43,8 +43,10 @@ public class GeneralConference {
     }
 
     private static void writeConference(WebDriver driver, File rootFolder, String conferenceUrl) throws IOException {
-        // Navigate to this general conference page.
-        driver.navigate().to(conferenceUrl);
+        // Navigate to this general conference page, if needed.
+        if (!driver.getCurrentUrl().equals(conferenceUrl)) {
+            driver.navigate().to(conferenceUrl);
+        }
         // Extract conference title as `YYYY-MM`.
         final WebElement titleHeader = driver.findElement(By.className("bookTitle-39aO5"));
         final String conferenceTitle = titleHeader.getText();
