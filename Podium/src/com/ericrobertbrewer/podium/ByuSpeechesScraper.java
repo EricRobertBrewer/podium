@@ -304,7 +304,7 @@ public class ByuSpeechesScraper {
             }
         }
         // Close a previously-written note [line], if one exists.
-        if (notesCount > 1) {
+        if (notesCount > 0) {
             notesOut.println();
         }
         // Close files.
