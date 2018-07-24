@@ -1,0 +1,25 @@
+{
+  "name": "@ericrobertbrewer/podium",
+  "version": "0.0.1",
+  "description": "Collect, organize, and make available LDS talks, devotional messages, firesides, and more.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@bitbucket.org/ericrobertbrewer/podium.git"
+  },
+  "keywords": [
+    "lds",
+    "mormon",
+    "general-conference",
+    "byu-speeches"
+  ],
+  "author": "Eric Brewer <eric.r.brewer@gmail.com>",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/ericrobertbrewer/podium#readme",
+  "dependencies": {
+    "@bencrowder/scriptures-json": "^1.0.0"
+  }
+}

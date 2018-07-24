@@ -12,6 +12,9 @@ public class Folders {
     public static final String CONTENT_GENERAL_CONFERENCE = CONTENT_ROOT + "general-conference" + File.separator;
     public static final String CONTENT_JESUS_THE_CHRIST = CONTENT_ROOT + "jesus-the-christ" + File.separator;
 
+    public static final String NODE_MODULES_ROOT = ".." + File.separator + "node_modules" + File.separator;
+    public static final String SCRIPTURES_ROOT = NODE_MODULES_ROOT + "@bencrowder" + File.separator + "scriptures-json" + File.separator;
+
     private Folders() {
     }
 }
