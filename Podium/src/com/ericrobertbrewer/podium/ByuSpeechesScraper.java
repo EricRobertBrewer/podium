@@ -299,8 +299,15 @@ public class ByuSpeechesScraper {
                     final String liText = htmlToText(liHtml);
                     out.println("##" + liText);
                 }
+            } else if ("i".equals(tagName)) {
+                // For example, `https://speeches.byu.edu/talks/dilworth-b-parkinson_received-need/`.
+                final String iHtml = child.getAttribute("innerHTML");
+                final String iText = htmlToText(iHtml);
+                if (iText.length() > 0) {
+                    out.println(iText);
+                }
             } else {
-                System.out.println("Unknown tag `" + tagName + "`.");
+                System.out.println("Unknown tag `" + tagName + "` in page for `" + file.getPath() + "`.");
             }
         }
         // Close a previously-written note [line], if one exists.
