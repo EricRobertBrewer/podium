@@ -6,11 +6,11 @@ import java.io.File;
 
 public class ChristmasDevotionalsScraper extends Scraper {
 
-    public ChristmasDevotionalsScraper(WebDriver driver, File rootFolder) {
-        super(driver, rootFolder);
+    public ChristmasDevotionalsScraper(WebDriver driver) {
+        super(driver);
     }
 
-    public void scrapeAll(boolean force) {
+    public void scrapeAll(File rootFolder, boolean force) {
         getDriver().navigate().to("https://www.lds.org/languages/eng/lib/jesus-christ/christmas-devotionals");
         // TODO
     }

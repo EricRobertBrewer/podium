@@ -11,11 +11,11 @@ import java.util.List;
 
 public class GeneralConferenceScraper extends Scraper {
 
-    public GeneralConferenceScraper(WebDriver driver, File rootFolder) {
-        super(driver, rootFolder);
+    public GeneralConferenceScraper(WebDriver driver) {
+        super(driver);
     }
 
-    public void scrapeAll(boolean force) {
+    public void scrapeAll(File rootFolder, boolean force) {
         getDriver().navigate().to("https://www.lds.org/languages/eng/lib/general-conference");
         // Collect conference URLs before navigating away from this page.
         final List<String> urls = new ArrayList<String>();
@@ -34,18 +34,18 @@ public class GeneralConferenceScraper extends Scraper {
             final String url = urls.get(i);
             final String title = titles.get(i);
             try {
-                scrapeConference(url, title, force);
+                scrapeConference(rootFolder, url, title, force);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void scrapeConference(String url, String title, boolean force) throws IOException {
+    private void scrapeConference(File rootFolder, String url, String title, boolean force) throws IOException {
         // Convert conference title to `YYYY-MM`.
         final String fileName = toConferenceFileName(title);
         // Create the directory into which the talks will be written.
-        final File folder = new File(getRootFolder(), fileName);
+        final File folder = new File(rootFolder, fileName);
         if (folder.exists()) {
             if (force) {
                 // Since `force == true`, delete the folder then re-create it.

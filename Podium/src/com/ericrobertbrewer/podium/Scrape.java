@@ -1,6 +1,6 @@
-package com.ericrobertbrewer.podium.web;
+package com.ericrobertbrewer.podium;
 
-import com.ericrobertbrewer.podium.Folders;
+import com.ericrobertbrewer.podium.web.*;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 
@@ -42,12 +42,12 @@ public final class Scrape {
         }
         // Create the root folder.
         final File rootFolder = new File(contentOption.rootFolderName);
-        if (!rootFolder.exists() && !rootFolder.mkdir()) {
+        if (!rootFolder.exists() && !rootFolder.mkdirs()) {
             throw new RuntimeException("Unable to create root directory: `" + rootFolder.getPath() + "`.");
         }
         // Scrape the web content.
-        final Scraper scraper = contentOption.newInstance(driver, rootFolder);
-        scraper.scrapeAll(force);
+        final Scraper scraper = contentOption.newInstance(driver);
+        scraper.scrapeAll(rootFolder, force);
         scraper.quit();
     }
 
@@ -62,44 +62,44 @@ public final class Scrape {
             this.rootFolderName = rootFolderName;
         }
 
-        abstract Scraper newInstance(WebDriver driver, File rootFolder);
+        abstract Scraper newInstance(WebDriver driver);
     }
 
     private static final ContentOption[] CONTENT_OPTIONS = {
             new ContentOption("byu", "BYU Provo Speeches", Folders.CONTENT_BYU_SPEECHES) {
                 @Override
-                Scraper newInstance(WebDriver driver, File rootFolder) {
-                    return new ByuSpeechesScraper(driver, rootFolder);
+                Scraper newInstance(WebDriver driver) {
+                    return new ByuSpeechesScraper(driver);
                 }
             },
             new ContentOption("byuh", "BYU Hawai'i Speeches", Folders.CONTENT_BYUH_SPEECHES) {
                 @Override
-                Scraper newInstance(WebDriver driver, File rootFolder) {
-                    return new ByuhSpeechesScraper(driver, rootFolder);
+                Scraper newInstance(WebDriver driver) {
+                    return new ByuhSpeechesScraper(driver);
                 }
             },
             new ContentOption("byui", "BYU Idaho Speeches", Folders.CONTENT_BYUI_SPEECHES) {
                 @Override
-                Scraper newInstance(WebDriver driver, File rootFolder) {
-                    return new ByuiSpeechesScraper(driver, rootFolder);
+                Scraper newInstance(WebDriver driver) {
+                    return new ByuiSpeechesScraper(driver);
                 }
             },
             new ContentOption("xmas", "Christmas Devotionals", Folders.CONTENT_CHRISTMAS_DEVOTIONALS) {
                 @Override
-                Scraper newInstance(WebDriver driver, File rootFolder) {
-                    return new ChristmasDevotionalsScraper(driver, rootFolder);
+                Scraper newInstance(WebDriver driver) {
+                    return new ChristmasDevotionalsScraper(driver);
                 }
             },
             new ContentOption("gc", "General Conference Talks", Folders.CONTENT_GENERAL_CONFERENCE) {
                 @Override
-                Scraper newInstance(WebDriver driver, File rootFolder) {
-                    return new GeneralConferenceScraper(driver, rootFolder);
+                Scraper newInstance(WebDriver driver) {
+                    return new GeneralConferenceScraper(driver);
                 }
             },
             new ContentOption("jtc", "Jesus the Christ Chapters", Folders.CONTENT_JESUS_THE_CHRIST) {
                 @Override
-                Scraper newInstance(WebDriver driver, File rootFolder) {
-                    return new JesusTheChristScraper(driver, rootFolder);
+                Scraper newInstance(WebDriver driver) {
+                    return new JesusTheChristScraper(driver);
                 }
             }
     };

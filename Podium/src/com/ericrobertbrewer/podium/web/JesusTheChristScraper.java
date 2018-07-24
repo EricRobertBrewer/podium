@@ -6,11 +6,11 @@ import java.io.File;
 
 public class JesusTheChristScraper extends Scraper {
 
-    public JesusTheChristScraper(WebDriver driver, File rootFolder) {
-        super(driver, rootFolder);
+    public JesusTheChristScraper(WebDriver driver) {
+        super(driver);
     }
 
-    public void scrapeAll(boolean force) {
+    public void scrapeAll(File rootFolder, boolean force) {
         getDriver().navigate().to("https://www.lds.org/languages/eng/content/manual/jesus-the-christ");
         // TODO
     }

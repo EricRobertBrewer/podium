@@ -6,11 +6,11 @@ import java.io.File;
 
 public class ByuiSpeechesScraper extends Scraper {
 
-    public ByuiSpeechesScraper(WebDriver driver, File rootFolder) {
-        super(driver, rootFolder);
+    public ByuiSpeechesScraper(WebDriver driver) {
+        super(driver);
     }
 
-    public void scrapeAll(boolean force) {
+    public void scrapeAll(File rootFolder, boolean force) {
         getDriver().navigate().to("https://web.byui.edu/devotionalsandspeeches/");
         // TODO
     }

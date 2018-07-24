@@ -12,11 +12,11 @@ import java.util.List;
 
 public class ByuSpeechesScraper extends Scraper {
 
-    public ByuSpeechesScraper(WebDriver driver, File rootFolder) {
-        super(driver, rootFolder);
+    public ByuSpeechesScraper(WebDriver driver) {
+        super(driver);
     }
 
-    public void scrapeAll(boolean force) {
+    public void scrapeAll(File rootFolder, boolean force) {
         getDriver().navigate().to("https://speeches.byu.edu/talks/");
         final List<String> years = new ArrayList<String>();
         final WebElement yearSelect = getDriver().findElement(By.id("speech-date-archive__year-selection"));
@@ -26,16 +26,16 @@ public class ByuSpeechesScraper extends Scraper {
         }
         for (String year : years) {
             try {
-                scrapeYear(year, force);
+                scrapeYear(rootFolder, year, force);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void scrapeYear(String year, boolean force) throws IOException {
+    private void scrapeYear(File rootFolder, String year, boolean force) throws IOException {
         // Create the year folder.
-        final File folder = new File(getRootFolder(), year);
+        final File folder = new File(rootFolder, year);
         if (folder.exists()) {
             if (force) {
                 FileUtils.deleteDirectory(folder);
