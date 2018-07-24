@@ -1,14 +1,14 @@
-package com.ericrobertbrewer.podium;
+package com.ericrobertbrewer.podium.web;
 
+import com.ericrobertbrewer.podium.Folders;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 
 import java.io.File;
-import java.io.IOException;
 
-public class ChristmasDevotionalsScraper {
+public class ChristmasDevotionalsScraper extends Scraper {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         if (args.length < 2 || args.length > 3) {
             throw new IllegalArgumentException("Usage: <driver-name> <path> [<force>]");
         }
@@ -32,19 +32,15 @@ public class ChristmasDevotionalsScraper {
             throw new RuntimeException("Unable to create root directory: `" + rootFolder.getPath() + "`.");
         }
         final ChristmasDevotionalsScraper scraper = new ChristmasDevotionalsScraper(driver, rootFolder);
-        scraper.getAllDevotionals(force);
+        scraper.scrapeAll(force);
     }
-
-    private final WebDriver driver;
-    private final File rootFolder;
 
     private ChristmasDevotionalsScraper(WebDriver driver, File rootFolder) {
-        this.driver = driver;
-        this.rootFolder = rootFolder;
+        super(driver, rootFolder);
     }
 
-    private void getAllDevotionals(boolean force) throws IOException {
-        driver.navigate().to("https://www.lds.org/languages/eng/lib/jesus-christ/christmas-devotionals");
+    public void scrapeAll(boolean force) {
+        getDriver().navigate().to("https://www.lds.org/languages/eng/lib/jesus-christ/christmas-devotionals");
         // TODO
     }
 }

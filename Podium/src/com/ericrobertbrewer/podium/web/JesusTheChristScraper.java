@@ -1,14 +1,14 @@
-package com.ericrobertbrewer.podium;
+package com.ericrobertbrewer.podium.web;
 
+import com.ericrobertbrewer.podium.Folders;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 
 import java.io.File;
-import java.io.IOException;
 
-public class ByuiSpeechesScraper {
+public class JesusTheChristScraper extends Scraper {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         if (args.length < 2 || args.length > 3) {
             throw new IllegalArgumentException("Usage: <driver-name> <path> [<force>]");
         }
@@ -27,24 +27,20 @@ public class ByuiSpeechesScraper {
         } else {
             force = false;
         }
-        final File rootFolder = new File(Folders.CONTENT_BYUI_SPEECHES);
+        final File rootFolder = new File(Folders.CONTENT_JESUS_THE_CHRIST);
         if (!rootFolder.exists() && !rootFolder.mkdir()) {
             throw new RuntimeException("Unable to create root directory: `" + rootFolder.getPath() + "`.");
         }
-        final ByuiSpeechesScraper scraper = new ByuiSpeechesScraper(driver, rootFolder);
-        scraper.getAllSpeeches(force);
+        final JesusTheChristScraper scraper = new JesusTheChristScraper(driver, rootFolder);
+        scraper.scrapeAll(force);
     }
 
-    private final WebDriver driver;
-    private final File rootFolder;
-
-    private ByuiSpeechesScraper(WebDriver driver, File rootFolder) {
-        this.driver = driver;
-        this.rootFolder = rootFolder;
+    private JesusTheChristScraper(WebDriver driver, File rootFolder) {
+        super(driver, rootFolder);
     }
 
-    private void getAllSpeeches(boolean force) throws IOException {
-        driver.navigate().to("https://web.byui.edu/devotionalsandspeeches/");
+    public void scrapeAll(boolean force) {
+        getDriver().navigate().to("https://www.lds.org/languages/eng/content/manual/jesus-the-christ");
         // TODO
     }
 }

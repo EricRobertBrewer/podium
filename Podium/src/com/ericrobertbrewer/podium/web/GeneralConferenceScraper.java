@@ -1,6 +1,6 @@
-package com.ericrobertbrewer.podium;
+package com.ericrobertbrewer.podium.web;
 
-import com.ericrobertbrewer.podium.web.DriverUtils;
+import com.ericrobertbrewer.podium.Folders;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -11,9 +11,9 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class GeneralConferenceScraper {
+public class GeneralConferenceScraper extends Scraper {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         if (args.length < 2 || args.length > 3) {
             throw new IllegalArgumentException("Usage: <driver-name> <path> [<force>]");
         }
@@ -37,23 +37,20 @@ public class GeneralConferenceScraper {
             throw new RuntimeException("Unable to create root directory: `" + rootFolder.getPath() + "`.");
         }
         final GeneralConferenceScraper scraper = new GeneralConferenceScraper(driver, rootFolder);
-        scraper.getAllConferences(force);
+        scraper.scrapeAll(force);
+        scraper.quit();
     }
-
-    private final WebDriver driver;
-    private final File rootFolder;
 
     private GeneralConferenceScraper(WebDriver driver, File rootFolder) {
-        this.driver = driver;
-        this.rootFolder = rootFolder;
+        super(driver, rootFolder);
     }
 
-    private void getAllConferences(boolean force) throws IOException {
-        driver.navigate().to("https://www.lds.org/languages/eng/lib/general-conference");
+    public void scrapeAll(boolean force) {
+        getDriver().navigate().to("https://www.lds.org/languages/eng/lib/general-conference");
         // Collect conference URLs before navigating away from this page.
         final List<String> urls = new ArrayList<String>();
         final List<String> titles = new ArrayList<String>();
-        final List<WebElement> tileAs = driver.findElements(By.className("tile-3KqhL"));
+        final List<WebElement> tileAs = getDriver().findElements(By.className("tile-3KqhL"));
         for (WebElement tileA : tileAs) {
             // Extract link.
             final String url = tileA.getAttribute("href");
@@ -66,15 +63,19 @@ public class GeneralConferenceScraper {
         for (int i = 0; i < urls.size(); i++) {
             final String url = urls.get(i);
             final String title = titles.get(i);
-            getConference(url, title, force);
+            try {
+                scrapeConference(url, title, force);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
-    private void getConference(String url, String title, boolean force) throws IOException {
+    private void scrapeConference(String url, String title, boolean force) throws IOException {
         // Convert conference title to `YYYY-MM`.
         final String fileName = toConferenceFileName(title);
         // Create the directory into which the talks will be written.
-        final File folder = new File(rootFolder, fileName);
+        final File folder = new File(getRootFolder(), fileName);
         if (folder.exists()) {
             if (force) {
                 // Since `force == true`, delete the folder then re-create it.
@@ -88,8 +89,8 @@ public class GeneralConferenceScraper {
             createConferenceFolder(folder);
         }
         // Navigate to this general conference page, if needed.
-        if (!driver.getCurrentUrl().equals(url)) {
-            driver.navigate().to(url);
+        if (!getDriver().getCurrentUrl().equals(url)) {
+            getDriver().navigate().to(url);
         }
         // Create the program file. Write the column headers.
         final File programFile = new File(folder, "program.tsv");
@@ -106,7 +107,7 @@ public class GeneralConferenceScraper {
         final List<String> talkUrls = new ArrayList<String>();
         final List<String> talkTitles = new ArrayList<String>();
         final List<String> speakers = new ArrayList<String>();
-        final WebElement talksListDiv = driver.findElement(By.className("items-21msL"));
+        final WebElement talksListDiv = getDriver().findElement(By.className("items-21msL"));
         final List<WebElement> talkAs = talksListDiv.findElements(By.tagName("a"));
         for (WebElement talkA : talkAs) {
             // Extract talk link.
@@ -116,7 +117,7 @@ public class GeneralConferenceScraper {
             final String talkTitle = talkA.getAttribute("data-title").trim();
             talkTitles.add(talkTitle);
             // Extract speaker.
-            // This may be overridden by `getTalk`, since the page itself may have additional, informative leading words.
+            // This may be overridden by `scrapeTalk`, since the page itself may have additional, informative leading words.
             final String speaker = DriverUtils.getElementTextOrEmpty(talkA, By.className("subtitle-GfBVZ")).trim();
             speakers.add(speaker);
         }
@@ -124,20 +125,20 @@ public class GeneralConferenceScraper {
             final String talkUrl = talkUrls.get(i);
             final String talkTitle = talkTitles.get(i);
             final String speaker = speakers.get(i);
-            getTalk(folder, talkUrl, talkTitle, speaker, programOut);
+            scrapeTalk(folder, talkUrl, talkTitle, speaker, programOut);
         }
         programOut.close();
         programOutputStream.close();
     }
 
-    private void getTalk(File conferenceFolder, String url, String title, String speaker, PrintStream programOut) throws IOException {
+    private void scrapeTalk(File conferenceFolder, String url, String title, String speaker, PrintStream programOut) throws IOException {
         // Navigate to this talk, if needed.
-        if (!driver.getCurrentUrl().equals(url)) {
-            driver.navigate().to(url);
+        if (!getDriver().getCurrentUrl().equals(url)) {
+            getDriver().navigate().to(url);
         }
         // Close the left navigation panel if it's open.
         // It would otherwise prevent us from opening the "Related Content" section, reading content, etc.
-        final WebElement navigationDiv = DriverUtils.findElementOrNull(driver, By.className("leftPanelOpen-3UyrD"));
+        final WebElement navigationDiv = DriverUtils.findElementOrNull(getDriver(), By.className("leftPanelOpen-3UyrD"));
         if (navigationDiv != null && navigationDiv.isDisplayed()) {
             final WebElement backHeader = navigationDiv.findElement(By.className("backToAll-1PgB6"));
             final WebElement closeButton = backHeader.findElement(By.tagName("button"));
@@ -151,7 +152,7 @@ public class GeneralConferenceScraper {
         }
         // Open the "Related Content" section.
         // This seems to prevent references from being read as blank.
-        final WebElement panelHeader = DriverUtils.findElementOrNull(driver, By.className("contentHead-3F0ox"));
+        final WebElement panelHeader = DriverUtils.findElementOrNull(getDriver(), By.className("contentHead-3F0ox"));
         if (panelHeader != null) {
             final List<WebElement> buttons = panelHeader.findElements(By.className("iconButton--V5Iv"));
             for (WebElement button : buttons) {
@@ -174,7 +175,7 @@ public class GeneralConferenceScraper {
         final String referencesFileName;
         final int referenceCount;
         // Work within the content section.
-        final WebElement contentSection = DriverUtils.findElementOrNull(driver, By.id("content"));
+        final WebElement contentSection = DriverUtils.findElementOrNull(getDriver(), By.id("content"));
         if (contentSection != null) {
             // Extract speaker and role. (Role may not be present on page.)
             final WebElement byDiv = DriverUtils.findElementOrNull(contentSection, By.className("byline"));
@@ -203,7 +204,7 @@ public class GeneralConferenceScraper {
             // Extract the file name from the URL.
             final String fileNameBase = url.substring(url.lastIndexOf('/') + 1);
             // Collect any references in the "Related Content" section.
-            final WebElement referencesAside = driver.findElement(By.className("rightPanel-2LIL7"));
+            final WebElement referencesAside = getDriver().findElement(By.className("rightPanel-2LIL7"));
             final WebElement referencesSection = DriverUtils.findElementOrNull(referencesAside, By.className("panelGridLayout-3J74n"));
             if (referencesSection != null) {
                 // Create and write to references file.

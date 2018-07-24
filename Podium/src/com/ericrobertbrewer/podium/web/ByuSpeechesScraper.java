@@ -1,6 +1,6 @@
-package com.ericrobertbrewer.podium;
+package com.ericrobertbrewer.podium.web;
 
-import com.ericrobertbrewer.podium.web.DriverUtils;
+import com.ericrobertbrewer.podium.Folders;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -12,9 +12,9 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ByuSpeechesScraper {
+public class ByuSpeechesScraper extends Scraper {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         if (args.length < 2 || args.length > 3) {
             throw new IllegalArgumentException("Usage: <driver-name> <path> [<force>]");
         }
@@ -38,33 +38,33 @@ public class ByuSpeechesScraper {
             throw new RuntimeException("Unable to create root directory: `" + rootFolder.getPath() + "`.");
         }
         final ByuSpeechesScraper scraper = new ByuSpeechesScraper(driver, rootFolder);
-        scraper.getAllSpeeches(force);
+        scraper.scrapeAll(force);
     }
-
-    private final WebDriver driver;
-    private final File rootFolder;
 
     private ByuSpeechesScraper(WebDriver driver, File rootFolder) {
-        this.driver = driver;
-        this.rootFolder = rootFolder;
+        super(driver, rootFolder);
     }
 
-    private void getAllSpeeches(boolean force) throws IOException {
-        driver.navigate().to("https://speeches.byu.edu/talks/");
+    public void scrapeAll(boolean force) {
+        getDriver().navigate().to("https://speeches.byu.edu/talks/");
         final List<String> years = new ArrayList<String>();
-        final WebElement yearSelect = driver.findElement(By.id("speech-date-archive__year-selection"));
+        final WebElement yearSelect = getDriver().findElement(By.id("speech-date-archive__year-selection"));
         final List<WebElement> yearOptions = yearSelect.findElements(By.tagName("option"));
         for (WebElement yearOption : yearOptions) {
             years.add(yearOption.getAttribute("value").trim());
         }
         for (String year : years) {
-            getYear(year, force);
+            try {
+                scrapeYear(year, force);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
-    private void getYear(String year, boolean force) throws IOException {
+    private void scrapeYear(String year, boolean force) throws IOException {
         // Create the year folder.
-        final File folder = new File(rootFolder, year);
+        final File folder = new File(getRootFolder(), year);
         if (folder.exists()) {
             if (force) {
                 FileUtils.deleteDirectory(folder);
@@ -77,12 +77,12 @@ public class ByuSpeechesScraper {
         }
         // Navigate to the URL, if necessary.
         final String url = "https://speeches.byu.edu/talks/" + year + "/";
-        if (!url.equals(driver.getCurrentUrl())) {
-            driver.navigate().to(url);
+        if (!url.equals(getDriver().getCurrentUrl())) {
+            getDriver().navigate().to(url);
         }
         // Scroll down a few times, each time waiting for a tenth of a second, then wait again.
         // This tends to help load all of the talks.
-        scrollDown(driver, 25);
+        scrollDown(getDriver(), 25);
         try {
             Thread.sleep(3000);
         } catch (InterruptedException e) {
@@ -104,7 +104,7 @@ public class ByuSpeechesScraper {
         final List<String> titles = new ArrayList<String>();
         final List<String> speakers = new ArrayList<String>();
         final List<String> dates = new ArrayList<String>();
-        final WebElement listDiv = driver.findElement(By.id("speech-date-archive-listing__talks-list"));
+        final WebElement listDiv = getDriver().findElement(By.id("speech-date-archive-listing__talks-list"));
         final List<WebElement> listItems = listDiv.findElements(By.tagName("li"));
         for (WebElement listItem : listItems) {
             final WebElement rightDiv = listItem.findElement(By.className("image-excerpt-media-listing-block__right"));
@@ -127,23 +127,23 @@ public class ByuSpeechesScraper {
             final String title = titles.get(i);
             final String speaker = speakers.get(i);
             final String date = dates.get(i);
-            getSpeech(folder, talkUrl, title, speaker, date, summaryOut);
+            scrapeSpeech(folder, talkUrl, title, speaker, date, summaryOut);
         }
         summaryOut.close();
         summaryOutputStream.close();
     }
 
-    private void getSpeech(File folder, String url, String title, String speaker, String date, PrintStream summaryOut) throws IOException {
+    private void scrapeSpeech(File folder, String url, String title, String speaker, String date, PrintStream summaryOut) throws IOException {
         // Navigate to this talk, if needed.
-        if (!driver.getCurrentUrl().equals(url)) {
-            driver.navigate().to(url);
+        if (!getDriver().getCurrentUrl().equals(url)) {
+            getDriver().navigate().to(url);
         }
         final String position;
         final String type;
         final String topics;
         final String fileName;
         final String notesFileName;
-        final WebElement main = DriverUtils.findElementOrNull(driver, By.tagName("main"));
+        final WebElement main = DriverUtils.findElementOrNull(getDriver(), By.tagName("main"));
         if (main != null) {
             // Extract position and type.
             final WebElement metaSection = main.findElement(By.className("section__speech-meta"));
@@ -156,7 +156,7 @@ public class ByuSpeechesScraper {
                 type = "";
             }
             // Extract talk.
-            final WebElement bodyDiv = DriverUtils.findElementOrNull(driver, By.className("body-copy__standard"));
+            final WebElement bodyDiv = DriverUtils.findElementOrNull(getDriver(), By.className("body-copy__standard"));
             if (bodyDiv != null) {
                 final String fileNameBase = getFileNameBase(url);
                 // Create the speech file.
