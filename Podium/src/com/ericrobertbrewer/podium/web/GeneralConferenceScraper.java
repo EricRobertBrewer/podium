@@ -1,11 +1,9 @@
 package com.ericrobertbrewer.podium.web;
 
-import com.ericrobertbrewer.podium.Folders;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.chrome.ChromeDriver;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -13,35 +11,7 @@ import java.util.List;
 
 public class GeneralConferenceScraper extends Scraper {
 
-    public static void main(String[] args) {
-        if (args.length < 2 || args.length > 3) {
-            throw new IllegalArgumentException("Usage: <driver-name> <path> [<force>]");
-        }
-        final String driverName = args[0];
-        final String path = args[1];
-        final WebDriver driver;
-        if ("chrome".equalsIgnoreCase(driverName)) {
-            System.setProperty("webdriver.chrome.driver", path);
-            driver = new ChromeDriver();
-        } else {
-            throw new IllegalArgumentException("Unknown driver name: `" + driverName + "`.");
-        }
-        final boolean force;
-        if (args.length > 2) {
-            force = Boolean.parseBoolean(args[2]);
-        } else {
-            force = false;
-        }
-        final File rootFolder = new File(Folders.CONTENT_GENERAL_CONFERENCE);
-        if (!rootFolder.exists() && !rootFolder.mkdir()) {
-            throw new RuntimeException("Unable to create root directory: `" + rootFolder.getPath() + "`.");
-        }
-        final GeneralConferenceScraper scraper = new GeneralConferenceScraper(driver, rootFolder);
-        scraper.scrapeAll(force);
-        scraper.quit();
-    }
-
-    private GeneralConferenceScraper(WebDriver driver, File rootFolder) {
+    public GeneralConferenceScraper(WebDriver driver, File rootFolder) {
         super(driver, rootFolder);
     }
 
