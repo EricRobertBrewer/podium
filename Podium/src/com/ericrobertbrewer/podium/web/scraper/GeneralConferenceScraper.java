@@ -1,5 +1,7 @@
-package com.ericrobertbrewer.podium.web;
+package com.ericrobertbrewer.podium.web.scraper;
 
+import com.ericrobertbrewer.podium.web.DriverUtils;
+import com.ericrobertbrewer.podium.web.Encoding;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -42,6 +44,7 @@ public class GeneralConferenceScraper extends Scraper {
     }
 
     private void scrapeConference(File rootFolder, String url, String title, boolean force) throws IOException {
+        System.out.println("Starting `" + title + "`.");
         // Convert conference title to `YYYY-MM`.
         final String fileName = toConferenceFileName(title);
         // Create the directory into which the talks will be written.
@@ -72,7 +75,7 @@ public class GeneralConferenceScraper extends Scraper {
         }
         final OutputStream programOutputStream = new FileOutputStream(programFile);
         final PrintStream programOut = new PrintStream(programOutputStream);
-        programOut.println("title\tspeaker\trole\tkicker\tfile\tref_file\tref_count");
+        programOut.println("title\tspeaker\trole\tkicker\tfile\tref_file\turl");
         // Collect talk URLs before navigating.
         final List<String> talkUrls = new ArrayList<String>();
         final List<String> talkTitles = new ArrayList<String>();
@@ -115,7 +118,7 @@ public class GeneralConferenceScraper extends Scraper {
             closeButton.click();
             // Allow the navigation section to complete its close animation.
             try {
-                Thread.sleep(500);
+                Thread.sleep(500L);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -130,7 +133,7 @@ public class GeneralConferenceScraper extends Scraper {
                     button.click();
                     // Allow the "Related Content" section to complete its open animation.
                     try {
-                        Thread.sleep(500);
+                        Thread.sleep(500L);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -143,7 +146,6 @@ public class GeneralConferenceScraper extends Scraper {
         final String kicker;
         final String fileName;
         final String referencesFileName;
-        final int referenceCount;
         // Work within the content section.
         final WebElement contentSection = DriverUtils.findElementOrNull(getDriver(), By.id("content"));
         if (contentSection != null) {
@@ -179,18 +181,17 @@ public class GeneralConferenceScraper extends Scraper {
             if (referencesSection != null) {
                 // Create and write to references file.
                 referencesFileName = fileNameBase + "_ref.tsv";
-                referenceCount = writeReferences(referencesSection, conferenceFolder, referencesFileName);
+                writeReferences(referencesSection, conferenceFolder, referencesFileName);
             } else {
                 // No references exist.
                 referencesFileName = "";
-                referenceCount = 0;
             }
             // If this is a talk, create the file to which it will be written.
             final WebElement bodyBlockDiv = DriverUtils.findElementOrNull(contentSection, By.className("body-block"));
             if (bodyBlockDiv != null) {
                 // This is a talk.
                 fileName = fileNameBase + ".txt";
-                writeTalk(bodyBlockDiv, conferenceFolder, fileName, referenceCount);
+                writeTalk(bodyBlockDiv, conferenceFolder, fileName);
             } else {
                 // This is a session [video], i.e., not actually a talk by a speaker.
                 fileName = "";
@@ -203,122 +204,12 @@ public class GeneralConferenceScraper extends Scraper {
             kicker = "";
             fileName = "";
             referencesFileName = "";
-            referenceCount = 0;
         }
         // Add to the program.
         programOut.print(title + "\t" + speaker + "\t" + role + "\t" + kicker);
-        programOut.print("\t" + fileName + "\t" + referencesFileName + "\t" + referenceCount);
+        programOut.print("\t" + fileName + "\t" + referencesFileName);
+        programOut.print("\t" + url);
         programOut.println();
-    }
-
-    /**
-     * Write the references to the given file.
-     * @param referencesSection The `section` which contains the references.
-     * @param conferenceFolder The conference folder.
-     * @param referencesFileName The name of the file.
-     * @return The number of references. This will be used to escape reference numbers in the talk's contents.
-     * @throws IOException When I/O error occurs.
-     */
-    private int writeReferences(WebElement referencesSection, File conferenceFolder, String referencesFileName) throws IOException {
-        final File referencesFile = new File(conferenceFolder, referencesFileName);
-        if (!referencesFile.createNewFile()) {
-            throw new RuntimeException("Unable to create references file: `" + referencesFile.getPath() + "`.");
-        }
-        if (!referencesFile.canWrite() && !referencesFile.setWritable(true)) {
-            throw new RuntimeException("Unable to write to references file: `" + referencesFile.getPath() + "`.");
-        }
-        final OutputStream outputStream = new FileOutputStream(referencesFile);
-        final PrintStream out = new PrintStream(outputStream);
-        // Print header.
-        out.println("id\treference");
-        final List<WebElement> referenceSpans = referencesSection.findElements(By.tagName("span"));
-        final List<WebElement> referenceDivs = referencesSection.findElements(By.tagName("div"));
-        final int referenceCount = referenceSpans.size();
-        for (int i = 0; i < referenceCount; i++) {
-            final WebElement span = referenceSpans.get(i);
-            final String spanText = span.getText().trim();
-            if (spanText.endsWith(".")) {
-                out.print(spanText.substring(0, spanText.lastIndexOf('.')));
-            } else {
-                out.print(spanText);
-            }
-            out.print("\t");
-            // Single references may contain multiple paragraphs. Separate paragraphs with two bar (`||`) characters.
-            final WebElement div = referenceDivs.get(i);
-            final List<WebElement> ps = div.findElements(By.tagName("p"));
-            boolean hasPrinted = false;
-            for (WebElement p : ps) {
-                final String pText = p.getText().trim();
-                // Skip blank paragraphs. Sometimes they are added for extra spacing (?).
-                // For example, `https://www.lds.org/languages/eng/content/general-conference/2018/04/the-prophet-of-god`.
-                if (pText.length() == 0) {
-                    continue;
-                }
-                if (hasPrinted) {
-                    out.print("||");
-                }
-                out.print(pText);
-                hasPrinted = true;
-            }
-            out.println();
-        }
-        out.close();
-        outputStream.close();
-        return referenceCount;
-    }
-
-    /**
-     * Write this talk to the given file.
-     * Also, escape reference numbers with less-than (<) and greater-than (>) symbols.
-     * @param bodyBlockDiv The `div` with `class="body-block"`.
-     * @param conferenceFolder The conference folder.
-     * @param fileName The name of the file.
-     * @param referenceCount The number of references. This may be used to verify the reference numbers in the text.
-     * @throws IOException When I/O error occurs.
-     */
-    private void writeTalk(WebElement bodyBlockDiv, File conferenceFolder, String fileName, int referenceCount) throws IOException {
-        final File file = new File(conferenceFolder, fileName);
-        if (!file.createNewFile()) {
-            throw new RuntimeException("Unable to create talk file: `" + file.getPath() + "`.");
-        }
-        if (!file.canWrite() && !file.setWritable(true)) {
-            throw new RuntimeException("Unable to write to talk file: `" + file.getPath() + "`.");
-        }
-        final OutputStream outputStream = new FileOutputStream(file);
-        final PrintStream out = new PrintStream(outputStream);
-        // Get every top-level child of the `body-block` `div`.
-        // We do this because `section`s and `p`s can be interspersed within a talk.
-        final List<WebElement> children = bodyBlockDiv.findElements(By.xpath("./*"));
-        for (WebElement child : children) {
-            if ("section".equals(child.getTagName())) {
-                // This child is a `section` with a header.
-                // For example, `https://www.lds.org/languages/eng/content/general-conference/2018/04/small-and-simple-things`.
-                final WebElement header = DriverUtils.findElementOrNull(child, By.tagName("header"));
-                if (header != null) {
-                    // Write the header text.
-                    // We assume that headers don't contain references.
-                    final String headerText = header.getText().trim();
-                    out.println("{{" + headerText + "}}");
-                }
-                // Write every paragraph's decoded text.
-                final List<WebElement> ps = child.findElements(By.tagName("p"));
-                for (WebElement p : ps) {
-                    writeText(p, out);
-                }
-            } else if ("p".equals(child.getTagName())){
-                // This child is not a `section`.
-                // We assume that it doesn't contain any nested paragraphs.
-                writeText(child, out);
-            } else {
-                // Probably just an `img`, but it may contain more text.
-                final List<WebElement> ps = child.findElements(By.tagName("p"));
-                for (WebElement p : ps) {
-                    writeText(p, out);
-                }
-            }
-        }
-        out.close();
-        outputStream.close();
     }
 
     private static final String MONTH_MM_APRIL = "04";
@@ -360,23 +251,184 @@ public class GeneralConferenceScraper extends Scraper {
         }
     }
 
-    private static void writeText(WebElement p, PrintStream out) {
-        final String pHtml = p.getAttribute("innerHTML").trim();
-        final String pText = htmlToText(pHtml);
-        out.println(pText);
+    /**
+     * Write the references to the given file.
+     * @param referencesSection The `section` which contains the references.
+     * @param conferenceFolder The conference folder.
+     * @param referencesFileName The name of the file.
+     * @throws IOException When I/O error occurs.
+     */
+    private static void writeReferences(WebElement referencesSection, File conferenceFolder, String referencesFileName) throws IOException {
+        final File referencesFile = new File(conferenceFolder, referencesFileName);
+        if (!referencesFile.createNewFile()) {
+            throw new RuntimeException("Unable to create references file: `" + referencesFile.getPath() + "`.");
+        }
+        if (!referencesFile.canWrite() && !referencesFile.setWritable(true)) {
+            throw new RuntimeException("Unable to write to references file: `" + referencesFile.getPath() + "`.");
+        }
+        final OutputStream outputStream = new FileOutputStream(referencesFile);
+        final PrintStream out = new PrintStream(outputStream);
+        // Print header.
+        out.println("id\treference");
+        final List<WebElement> referenceSpans = referencesSection.findElements(By.tagName("span"));
+        final List<WebElement> referenceDivs = referencesSection.findElements(By.tagName("div"));
+        final int referenceCount = referenceSpans.size();
+        for (int i = 0; i < referenceCount; i++) {
+            final WebElement span = referenceSpans.get(i);
+            final String spanText = span.getText().trim();
+            if (spanText.endsWith(".")) {
+                out.print(spanText.substring(0, spanText.lastIndexOf('.')));
+            } else {
+                out.print(spanText);
+            }
+            out.print("\t");
+            // Single references may contain multiple paragraphs. Separate paragraphs with two bar (`||`) characters.
+            final WebElement div = referenceDivs.get(i);
+            final List<WebElement> ps = div.findElements(By.tagName("p"));
+            boolean hasPrinted = false;
+            for (WebElement p : ps) {
+                final String pHtml = p.getAttribute("innerHTML").trim();
+                // Skip blank paragraphs. Sometimes they are added for extra spacing (?).
+                // For example, `https://www.lds.org/languages/eng/content/general-conference/2018/04/the-prophet-of-god`.
+                if (pHtml.length() == 0) {
+                    continue;
+                }
+                if (hasPrinted) {
+                    out.print("||");
+                }
+                out.print(pHtml);
+                hasPrinted = true;
+            }
+            out.println();
+        }
+        out.close();
+        outputStream.close();
     }
 
     /**
-     * Convert the inner HTML from a paragraph of a talk to a more readable text representation.
+     * Write this talk to the given file.
+     * Also, escape reference numbers with less-than (<) and greater-than (>) symbols.
+     * @param bodyBlockDiv The `div` with `class="body-block"`.
+     * @param conferenceFolder The conference folder.
+     * @param fileName The name of the file.
+     * @throws IOException When I/O error occurs.
+     */
+    private static void writeTalk(WebElement bodyBlockDiv, File conferenceFolder, String fileName) throws IOException {
+        final File file = new File(conferenceFolder, fileName);
+        if (!file.createNewFile()) {
+            throw new RuntimeException("Unable to create talk file: `" + file.getPath() + "`.");
+        }
+        if (!file.canWrite() && !file.setWritable(true)) {
+            throw new RuntimeException("Unable to write to talk file: `" + file.getPath() + "`.");
+        }
+        final OutputStream outputStream = new FileOutputStream(file);
+        final PrintStream out = new PrintStream(outputStream);
+        // Get every top-level child of the `body-block` `div`.
+        // We do this because `section`s and `p`s can be interspersed within a talk.
+        writeChildElements(bodyBlockDiv, out, file);
+        out.close();
+        outputStream.close();
+    }
+
+    private static void writeChildElements(WebElement element, PrintStream out, File file) {
+        writeChildElements(element, out, file, "");
+    }
+
+    private static void writeChildElements(WebElement element, PrintStream out, File file, String start) {
+        final List<WebElement> children = element.findElements(By.xpath("./*"));
+        for (WebElement child : children) {
+            writeChildElement(child, out, file, start);
+        }
+    }
+
+    private static void writeChildElement(WebElement child, PrintStream out, File file, String start) {
+        final String tagName = child.getTagName();
+        if ("p".equals(tagName)) {
+            // We assume that a `p` doesn't contain any nested paragraphs.
+            writeEncoded(child, out, start);
+        } else if ("header".equals(tagName)) {
+            // Write the encoded header text.
+            writeEncoded(child, out, Encoding.SECTION_START, Encoding.SECTION_END);
+        } else if ("section".equals(tagName)) {
+            // This child is a `section`, most likely containing a header.
+            // For example, `https://www.lds.org/languages/eng/content/general-conference/2018/04/small-and-simple-things`.
+            writeChildElements(child, out, file);
+        } else if ("ul".equals(tagName)) {
+            writeChildElements(child, out, file, Encoding.UNORDERED_LIST_ITEM);
+        } else if ("ol".equals(tagName)) {
+            writeChildElements(child, out, file, Encoding.ORDERED_LIST_ITEM);
+        } else if ("li".equals(tagName)) {
+            // A `li` may or may not have nested elements.
+            final List<WebElement> liChildren = child.findElements(By.xpath("./*"));
+            if (liChildren.size() > 0) {
+                for (WebElement liChild : liChildren) {
+                    // Assume that they're all `p` elements.
+                    if ("p".equals(liChild.getTagName())) {
+                        writeEncoded(liChild, out, start);
+                    } else {
+                        System.out.println("Unknown HTML element in <li>: `" + liChild.getTagName() + "` in `" + file.getPath() + "`.");
+                    }
+                }
+            } else {
+                writeEncoded(child, out, start);
+            }
+        } else if ("div".equals(tagName)) {
+            // This could be a `poetry` div.
+            // For example, `https://www.lds.org/languages/eng/content/general-conference/2018/04/small-and-simple-things`.
+            // For now, ignore any special `div` formatting.
+            writeChildElements(child, out, file, start);
+            // It could also be an `img` placeholder, in which case its only child element should be a `noscript`.
+        } else if ("img".equals(tagName)) {
+            // Save this image's properties. It may be useful later.
+            final String outerHtml = child.getAttribute("outerHTML").trim();
+            final String outerText = encode(outerHtml);
+            out.println(start + outerText);
+        } else if ("noscript".equals(tagName)) {
+            // Usually a placeholder for an `img`.
+            // If we scroll down, the `img` would load, but ChromeDriver has issues scrolling these pages.
+            // The inner content of the `noscript` seems to be the same as the loaded `img`, anyway.
+            final String text = child.getAttribute("innerHTML").trim();
+            final String divStart = "<div>";
+            final String divEnd = "</div>";
+            final String encodedText;
+            if (text.startsWith(divStart) && text.endsWith(divEnd)) {
+                encodedText = encode(text.substring(divStart.length(), text.length() - divEnd.length()));
+            } else {
+                encodedText = encode(text);
+            }
+            out.println(encodedText);
+        } else {
+            // `table`, `video`, `figure`, etc.
+            // See `https://www.lds.org/languages/eng/content/general-conference/2017/04/statistical-report-2016`.
+            // See `https://www.lds.org/languages/eng/content/general-conference/2014/10/joseph-smith`.
+            System.out.println("Unrecognized HTML tag `" + tagName + "` in `" + file.getPath() + "`.");
+            // Deal with this later.
+            final String outerHtml = child.getAttribute("outerHTML").trim();
+            final String outerText = encode(outerHtml);
+            out.println(start + outerText);
+        }
+    }
+
+    private static void writeEncoded(WebElement element, PrintStream out, String start) {
+        writeEncoded(element, out, start, "");
+    }
+
+    private static void writeEncoded(WebElement element, PrintStream out, String start, String end) {
+        final String html = element.getAttribute("innerHTML").trim();
+        final String text = encode(html);
+        out.println(start + text + end);
+    }
+
+    /**
+     * Encode reference numbers.
      * @param html Inner HTML from a paragraph of a talk.
      * @return A more readable text representation of a `p` element's inner HTML.
      */
-    private static String htmlToText(String html) {
+    private static String encode(String html) {
         // Replace the superscript reference notation with double arrow brackets.
-        return html.replaceAll("<a class=\"note-ref\" href=\"#note([0-9]+)\"><sup class=\"marker\">\\1</sup></a>", "<<$1>>")
-                // Ignore any other HTML tags, e.g. links, italics.
-                // Scripture references in parentheses can be parsed at another time.
-                .replaceAll("<(.+?).*?>(.*?)</\\1>", "$2");
+        // For now, retain any other HTML tags, e.g. links, italics.
+        return html.replaceAll("<a class=\"note-ref\" href=\"#note([0-9]+)\"><sup class=\"marker\">\\1</sup></a>",
+                Encoding.REFERENCE_NUMBER_START + "$1" + Encoding.REFERENCE_NUMBER_END);
     }
 
     /**

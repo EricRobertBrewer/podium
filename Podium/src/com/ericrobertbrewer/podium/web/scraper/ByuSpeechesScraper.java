@@ -1,8 +1,9 @@
-package com.ericrobertbrewer.podium.web;
+package com.ericrobertbrewer.podium.web.scraper;
 
+import com.ericrobertbrewer.podium.web.DriverUtils;
+import com.ericrobertbrewer.podium.web.Encoding;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
@@ -53,9 +54,9 @@ public class ByuSpeechesScraper extends Scraper {
         }
         // Scroll down a few times, each time waiting for a tenth of a second, then wait again.
         // This tends to help load all of the talks.
-        scrollDown(getDriver(), 25);
+        DriverUtils.scrollDown(getDriver(), 25, 100L);
         try {
-            Thread.sleep(3000);
+            Thread.sleep(3000L);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -204,7 +205,7 @@ public class ByuSpeechesScraper extends Scraper {
                 }
                 final String pHtml = child.getAttribute("innerHTML");
                 if (!hasReachedNotes) {
-                    final String pText = htmlToText(pHtml);
+                    final String pText = encode(pHtml);
                     out.println(pText);
                 } else {
                     // Determine whether or not this is a new note.
@@ -234,13 +235,13 @@ public class ByuSpeechesScraper extends Scraper {
             } else if ("h2".equals(tagName)) {
                 assert !hasReachedNotes;
                 final String h2Html = child.getAttribute("innerHTML");
-                final String h2Text = htmlToText(h2Html);
-                out.println("{{" + h2Text + "}}");
+                final String h2Text = encode(h2Html);
+                out.println(Encoding.SECTION_START + h2Text + Encoding.SECTION_END);
             } else if ("h3".equals(tagName)) {
                 assert !hasReachedNotes;
                 final String h3Html = child.getAttribute("innerHTML");
-                final String h3Text = htmlToText(h3Html);
-                out.println("{{{" + h3Text + "}}}");
+                final String h3Text = encode(h3Html);
+                out.println(Encoding.SUBSECTION_START + h3Text + Encoding.SUBSECTION_END);
             } else if ("div".equals(tagName)) {
                 // A `div` is usually a related topics/talks sections.
                 if ("related_topics_and_talks".equals(className)) {
@@ -260,20 +261,20 @@ public class ByuSpeechesScraper extends Scraper {
                 final List<WebElement> lis = child.findElements(By.tagName("li"));
                 for (WebElement li : lis) {
                     final String liHtml = li.getAttribute("innerHTML");
-                    final String liText = htmlToText(liHtml);
-                    out.println("__" + liText);
+                    final String liText = encode(liHtml);
+                    out.println(Encoding.UNORDERED_LIST_ITEM + liText);
                 }
             } else if ("ol".equals(tagName)) {
                 final List<WebElement> lis = child.findElements(By.tagName("li"));
                 for (WebElement li : lis) {
                     final String liHtml = li.getAttribute("innerHTML");
-                    final String liText = htmlToText(liHtml);
-                    out.println("##" + liText);
+                    final String liText = encode(liHtml);
+                    out.println(Encoding.ORDERED_LIST_ITEM + liText);
                 }
             } else if ("i".equals(tagName)) {
                 // For example, `https://speeches.byu.edu/talks/dilworth-b-parkinson_received-need/`.
                 final String iHtml = child.getAttribute("innerHTML");
-                final String iText = htmlToText(iHtml);
+                final String iText = encode(iHtml);
                 if (iText.length() > 0) {
                     out.println(iText);
                 }
@@ -299,17 +300,6 @@ public class ByuSpeechesScraper extends Scraper {
         }
     }
 
-    private static void scrollDown(WebDriver driver, int times) {
-        for (int i = 0; i < times; i++) {
-            ((JavascriptExecutor) driver).executeScript("window.scrollBy(0, 250)");
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
     private static String getFileNameBase(String url) {
         if (url.endsWith("/")) {
             return getFileNameBase(url.substring(0, url.length() - 1));
@@ -317,9 +307,10 @@ public class ByuSpeechesScraper extends Scraper {
         return url.substring(url.lastIndexOf('/') + 1);
     }
 
-    private static String htmlToText(String html) {
+    private static String encode(String html) {
         // Encode note reference super-scripts as `<<#>>`.
         // For now, leave all other sub-tags.
-        return html.replaceAll("<sup>([0-9]+)</sup>", "<<$1>>");
+        return html.replaceAll("<sup>([0-9]+)</sup>",
+                Encoding.REFERENCE_NUMBER_START + "$1" + Encoding.REFERENCE_NUMBER_END);
     }
 }

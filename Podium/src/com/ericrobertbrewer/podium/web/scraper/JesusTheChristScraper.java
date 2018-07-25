@@ -1,4 +1,4 @@
-package com.ericrobertbrewer.podium.web;
+package com.ericrobertbrewer.podium.web.scraper;
 
 import org.openqa.selenium.WebDriver;
 

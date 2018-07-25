@@ -1,6 +1,6 @@
 package com.ericrobertbrewer.podium;
 
-import com.ericrobertbrewer.podium.web.*;
+import com.ericrobertbrewer.podium.web.scraper.*;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
@@ -34,6 +34,13 @@ public final class Scrape {
         final String path = args[2];
         System.setProperty(driverOption.systemKey, path);
         final WebDriver driver = driverOption.newInstance();
+        // Create the scraper.
+        final Scraper scraper = contentOption.newInstance(driver);
+        // Create the root folder.
+        final File rootFolder = new File(contentOption.rootFolderName);
+        if (!rootFolder.exists() && !rootFolder.mkdirs()) {
+            throw new RuntimeException("Unable to create root directory: `" + rootFolder.getPath() + "`.");
+        }
         // Get the `force` argument.
         final boolean force;
         if (args.length > 3) {
@@ -41,15 +48,13 @@ public final class Scrape {
         } else {
             force = false;
         }
-        // Create the root folder.
-        final File rootFolder = new File(contentOption.rootFolderName);
-        if (!rootFolder.exists() && !rootFolder.mkdirs()) {
-            throw new RuntimeException("Unable to create root directory: `" + rootFolder.getPath() + "`.");
-        }
         // Scrape the web content.
-        final Scraper scraper = contentOption.newInstance(driver);
+        System.out.println("Scraping: " + contentOption.description);
+        System.out.println("Using driver: " + driverOption.description);
+        System.out.println("To directory: " + rootFolder.getPath());
         scraper.scrapeAll(rootFolder, force);
         scraper.quit();
+        System.out.println("Scrape complete.");
     }
 
     private static abstract class ContentOption {

@@ -1,9 +1,6 @@
 package com.ericrobertbrewer.podium.web;
 
-import org.openqa.selenium.By;
-import org.openqa.selenium.NoSuchElementException;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.*;
 
 public class DriverUtils {
 
@@ -39,5 +36,29 @@ public class DriverUtils {
         } catch (NoSuchElementException e) {
             return null;
         }
+    }
+
+    /**
+     * By 250 pixels.
+     * @param driver The driver.
+     * @param times Number of times to scroll down.
+     * @param delayMillis Number of milliseconds to delay after each downward scroll.
+     */
+    public static void scrollDown(WebDriver driver, int times, long delayMillis) {
+        for (int i = 0; i < times; i++) {
+            ((JavascriptExecutor) driver).executeScript("window.scrollBy(0, 250);");
+            try {
+                Thread.sleep(delayMillis);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void scrollToBottom(WebDriver driver) {
+        ((JavascriptExecutor) driver).executeScript("window.scrollTo(0, document.body.scrollHeight);");
+    }
+
+    private DriverUtils() {
     }
 }
