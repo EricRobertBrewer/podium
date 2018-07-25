@@ -3,6 +3,7 @@ package com.ericrobertbrewer.podium;
 import com.ericrobertbrewer.podium.web.*;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.firefox.FirefoxDriver;
 
 import java.io.File;
 import java.util.HashMap;
@@ -137,6 +138,12 @@ public final class Scrape {
                 @Override
                 WebDriver newInstance() {
                     return new ChromeDriver();
+                }
+            },
+            new DriverOption("firefox", "Mozilla Firefox", "webdriver.gecko.driver") {
+                @Override
+                WebDriver newInstance() {
+                    return new FirefoxDriver();
                 }
             }
     };
