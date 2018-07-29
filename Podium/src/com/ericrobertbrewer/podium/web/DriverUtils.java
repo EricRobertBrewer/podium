@@ -4,7 +4,7 @@ import org.openqa.selenium.*;
 
 public class DriverUtils {
 
-    public static String getElementTextOrEmpty(WebDriver driver, By by) {
+    public static String getTextOrEmpty(WebDriver driver, By by) {
         try {
             final WebElement inner = driver.findElement(by);
             return inner.getText();
@@ -13,7 +13,7 @@ public class DriverUtils {
         }
     }
 
-    public static String getElementTextOrEmpty(WebElement element, By by) {
+    public static String getTextOrEmpty(WebElement element, By by) {
         try {
             final WebElement inner = element.findElement(by);
             return inner.getText();

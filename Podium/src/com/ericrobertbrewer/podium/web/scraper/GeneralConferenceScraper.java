@@ -9,7 +9,9 @@ import org.openqa.selenium.WebElement;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class GeneralConferenceScraper extends Scraper {
 
@@ -19,6 +21,13 @@ public class GeneralConferenceScraper extends Scraper {
 
     public void scrapeAll(File rootFolder, boolean force) {
         getDriver().navigate().to("https://www.lds.org/languages/eng/lib/general-conference");
+        final String sourceFileName = "root.html";
+        try {
+            writeSource(rootFolder, sourceFileName, force);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        // TODO: Download giant images for conferences - `tileRow-3ETk4`.
         // Collect conference URLs before navigating away from this page.
         final List<String> urls = new ArrayList<String>();
         final List<String> titles = new ArrayList<String>();
@@ -44,27 +53,29 @@ public class GeneralConferenceScraper extends Scraper {
     }
 
     private void scrapeConference(File rootFolder, String url, String title, boolean force) throws IOException {
-        System.out.println("Starting `" + title + "`.");
         // Convert conference title to `YYYY-MM`.
         final String fileName = toConferenceFileName(title);
         // Create the directory into which the talks will be written.
         final File folder = new File(rootFolder, fileName);
         if (folder.exists()) {
             if (force) {
-                // Since `force == true`, delete the folder then re-create it.
+                // Since `force == true`, delete the folder.
                 FileUtils.deleteDirectory(folder);
-                createConferenceFolder(folder);
             } else {
                 // The folder exists and `force == false`. Skip this conference.
                 return;
             }
-        } else {
-            createConferenceFolder(folder);
+        }
+        if (!folder.mkdirs()) {
+            throw new RuntimeException("Unable to create conference folder: `" + folder.getPath() + "`.");
         }
         // Navigate to this general conference page, if needed.
         if (!getDriver().getCurrentUrl().equals(url)) {
             getDriver().navigate().to(url);
         }
+        System.out.println("Starting conference `" + title + "`.");
+        // Each individual talk has a complete navigation pane (there is no page which only contains the list of talks).
+        // For this reason, we do not save the page source for each conference root.
         // Create the program file. Write the column headers.
         final File programFile = new File(folder, "program.tsv");
         if (!programFile.createNewFile()) {
@@ -75,7 +86,7 @@ public class GeneralConferenceScraper extends Scraper {
         }
         final OutputStream programOutputStream = new FileOutputStream(programFile);
         final PrintStream programOut = new PrintStream(programOutputStream);
-        programOut.println("title\tspeaker\trole\tkicker\tfile\tref_file\turl");
+        programOut.println("title\tspeaker\trole\tkicker\ttext\treferences\turl\tsource");
         // Collect talk URLs before navigating.
         final List<String> talkUrls = new ArrayList<String>();
         final List<String> talkTitles = new ArrayList<String>();
@@ -91,7 +102,7 @@ public class GeneralConferenceScraper extends Scraper {
             talkTitles.add(talkTitle);
             // Extract speaker.
             // This may be overridden by `scrapeTalk`, since the page itself may have additional, informative leading words.
-            final String speaker = DriverUtils.getElementTextOrEmpty(talkA, By.className("subtitle-GfBVZ")).trim();
+            final String speaker = DriverUtils.getTextOrEmpty(talkA, By.className("subtitle-GfBVZ")).trim();
             speakers.add(speaker);
         }
         for (int i = 0; i < talkUrls.size(); i++) {
@@ -104,11 +115,12 @@ public class GeneralConferenceScraper extends Scraper {
         programOutputStream.close();
     }
 
-    private void scrapeTalk(File conferenceFolder, String url, String title, String speaker, PrintStream programOut) throws IOException {
+    private void scrapeTalk(File conferenceFolder, String url, String title, String speaker, PrintStream programOut) {
         // Navigate to this talk, if needed.
         if (!getDriver().getCurrentUrl().equals(url)) {
             getDriver().navigate().to(url);
         }
+        System.out.println("Starting talk `" + title + "`.");
         // Close the left navigation panel if it's open.
         // It would otherwise prevent us from opening the "Related Content" section, reading content, etc.
         final WebElement navigationDiv = DriverUtils.findElementOrNull(getDriver(), By.className("leftPanelOpen-3UyrD"));
@@ -141,6 +153,15 @@ public class GeneralConferenceScraper extends Scraper {
                 }
             }
         }
+        // Extract the file name from the URL.
+        final String fileNameBase = url.substring(url.lastIndexOf('/') + 1);
+        // Save the page source.
+        final String sourceFileName = fileNameBase + ".html";
+        try {
+            writeSource(conferenceFolder, sourceFileName);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         // Extract attributes from this page to be written to the program.
         final String role;
         final String kicker;
@@ -172,16 +193,18 @@ public class GeneralConferenceScraper extends Scraper {
                 role = "";
             }
             // Extract kicker.
-            kicker = DriverUtils.getElementTextOrEmpty(contentSection, By.id("kicker1")).trim();
-            // Extract the file name from the URL.
-            final String fileNameBase = url.substring(url.lastIndexOf('/') + 1);
+            kicker = DriverUtils.getTextOrEmpty(contentSection, By.id("kicker1")).trim();
             // Collect any references in the "Related Content" section.
             final WebElement referencesAside = getDriver().findElement(By.className("rightPanel-2LIL7"));
             final WebElement referencesSection = DriverUtils.findElementOrNull(referencesAside, By.className("panelGridLayout-3J74n"));
             if (referencesSection != null) {
                 // Create and write to references file.
                 referencesFileName = fileNameBase + "_ref.tsv";
-                writeReferences(referencesSection, conferenceFolder, referencesFileName);
+                try {
+                    writeReferences(referencesSection, conferenceFolder, referencesFileName);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             } else {
                 // No references exist.
                 referencesFileName = "";
@@ -191,7 +214,11 @@ public class GeneralConferenceScraper extends Scraper {
             if (bodyBlockDiv != null) {
                 // This is a talk.
                 fileName = fileNameBase + ".txt";
-                writeTalk(bodyBlockDiv, conferenceFolder, fileName);
+                try {
+                    writeText(bodyBlockDiv, conferenceFolder, fileName);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             } else {
                 // This is a session [video], i.e., not actually a talk by a speaker.
                 fileName = "";
@@ -208,8 +235,88 @@ public class GeneralConferenceScraper extends Scraper {
         // Add to the program.
         programOut.print(title + "\t" + speaker + "\t" + role + "\t" + kicker);
         programOut.print("\t" + fileName + "\t" + referencesFileName);
-        programOut.print("\t" + url);
+        programOut.print("\t" + url + "\t" + sourceFileName);
         programOut.println();
+    }
+
+    /**
+     * Write the references to the given file.
+     * @param referencesSection The `section` which contains the references.
+     * @param conferenceFolder The conference folder.
+     * @param referencesFileName The name of the file.
+     * @throws IOException When I/O error occurs.
+     */
+    private void writeReferences(WebElement referencesSection, File conferenceFolder, String referencesFileName) throws IOException {
+        final File referencesFile = new File(conferenceFolder, referencesFileName);
+        if (!referencesFile.createNewFile()) {
+            throw new RuntimeException("Unable to create references file: `" + referencesFile.getPath() + "`.");
+        }
+        if (!referencesFile.canWrite() && !referencesFile.setWritable(true)) {
+            throw new RuntimeException("Unable to write to references file: `" + referencesFile.getPath() + "`.");
+        }
+        final OutputStream outputStream = new FileOutputStream(referencesFile);
+        final PrintStream out = new PrintStream(outputStream);
+        // Print header.
+        out.println("id\treference");
+        final List<WebElement> referenceSpans = referencesSection.findElements(By.tagName("span"));
+        final List<WebElement> referenceDivs = referencesSection.findElements(By.tagName("div"));
+        final int referenceCount = referenceSpans.size();
+        for (int i = 0; i < referenceCount; i++) {
+            final WebElement span = referenceSpans.get(i);
+            final String spanText = span.getText().trim();
+            if (spanText.endsWith(".")) {
+                out.print(spanText.substring(0, spanText.lastIndexOf('.')));
+            } else {
+                out.print(spanText);
+            }
+            out.print("\t");
+            // Single references may contain multiple paragraphs. Separate paragraphs with two bar (`||`) characters.
+            final WebElement div = referenceDivs.get(i);
+            final List<WebElement> ps = div.findElements(By.tagName("p"));
+            boolean hasPrinted = false;
+            for (WebElement p : ps) {
+                final String pHtml = p.getAttribute("innerHTML").trim();
+                // Skip blank paragraphs. Sometimes they are added for extra spacing (?).
+                // See `https://www.lds.org/languages/eng/content/general-conference/2018/04/the-prophet-of-god`.
+                if (pHtml.length() == 0) {
+                    continue;
+                }
+                if (hasPrinted) {
+                    out.print(Encoding.PARAGRAPH_SEPARATOR);
+                }
+                out.print(pHtml);
+                hasPrinted = true;
+            }
+            out.println();
+        }
+        out.close();
+        outputStream.close();
+    }
+
+    /**
+     * Write this text to the given file.
+     * Escape reference numbers with two less-than (<<) and two greater-than (>>) symbols.
+     * Escape other unspoken text (section headers, etc.) inside double curly braces ({{,}}).
+     * @param bodyBlockDiv The `div` with `class="body-block"`.
+     * @param conferenceFolder The conference folder.
+     * @param fileName The name of the file.
+     * @throws IOException When I/O error occurs.
+     */
+    private void writeText(WebElement bodyBlockDiv, File conferenceFolder, String fileName) throws IOException {
+        final File file = new File(conferenceFolder, fileName);
+        if (!file.createNewFile()) {
+            throw new RuntimeException("Unable to create text file: `" + file.getPath() + "`.");
+        }
+        if (!file.canWrite() && !file.setWritable(true)) {
+            throw new RuntimeException("Unable to write to text file: `" + file.getPath() + "`.");
+        }
+        final OutputStream outputStream = new FileOutputStream(file);
+        final PrintStream out = new PrintStream(outputStream);
+        // Get every top-level child of the `body-block` `div`.
+        // We do this because `section`s, `p`s, etc. can be interspersed within a talk.
+        writeChildElementsOrSelf(bodyBlockDiv, out);
+        out.close();
+        outputStream.close();
     }
 
     private static final String MONTH_MM_APRIL = "04";
@@ -245,190 +352,131 @@ public class GeneralConferenceScraper extends Scraper {
         return month + " " + YYYY;
     }
 
-    private static void createConferenceFolder(File folder) {
-        if (!folder.mkdirs()) {
-            throw new RuntimeException("Unable to create conference folder: `" + folder.getPath() + "`.");
-        }
+    private static void writeChildElementsOrSelf(WebElement element, PrintStream out) {
+        writeChildElementsOrSelf(element, out, "", "");
     }
 
-    /**
-     * Write the references to the given file.
-     * @param referencesSection The `section` which contains the references.
-     * @param conferenceFolder The conference folder.
-     * @param referencesFileName The name of the file.
-     * @throws IOException When I/O error occurs.
-     */
-    private static void writeReferences(WebElement referencesSection, File conferenceFolder, String referencesFileName) throws IOException {
-        final File referencesFile = new File(conferenceFolder, referencesFileName);
-        if (!referencesFile.createNewFile()) {
-            throw new RuntimeException("Unable to create references file: `" + referencesFile.getPath() + "`.");
-        }
-        if (!referencesFile.canWrite() && !referencesFile.setWritable(true)) {
-            throw new RuntimeException("Unable to write to references file: `" + referencesFile.getPath() + "`.");
-        }
-        final OutputStream outputStream = new FileOutputStream(referencesFile);
-        final PrintStream out = new PrintStream(outputStream);
-        // Print header.
-        out.println("id\treference");
-        final List<WebElement> referenceSpans = referencesSection.findElements(By.tagName("span"));
-        final List<WebElement> referenceDivs = referencesSection.findElements(By.tagName("div"));
-        final int referenceCount = referenceSpans.size();
-        for (int i = 0; i < referenceCount; i++) {
-            final WebElement span = referenceSpans.get(i);
-            final String spanText = span.getText().trim();
-            if (spanText.endsWith(".")) {
-                out.print(spanText.substring(0, spanText.lastIndexOf('.')));
-            } else {
-                out.print(spanText);
-            }
-            out.print("\t");
-            // Single references may contain multiple paragraphs. Separate paragraphs with two bar (`||`) characters.
-            final WebElement div = referenceDivs.get(i);
-            final List<WebElement> ps = div.findElements(By.tagName("p"));
-            boolean hasPrinted = false;
-            for (WebElement p : ps) {
-                final String pHtml = p.getAttribute("innerHTML").trim();
-                // Skip blank paragraphs. Sometimes they are added for extra spacing (?).
-                // For example, `https://www.lds.org/languages/eng/content/general-conference/2018/04/the-prophet-of-god`.
-                if (pHtml.length() == 0) {
-                    continue;
-                }
-                if (hasPrinted) {
-                    out.print("||");
-                }
-                out.print(pHtml);
-                hasPrinted = true;
-            }
-            out.println();
-        }
-        out.close();
-        outputStream.close();
-    }
-
-    /**
-     * Write this talk to the given file.
-     * Also, escape reference numbers with less-than (<) and greater-than (>) symbols.
-     * @param bodyBlockDiv The `div` with `class="body-block"`.
-     * @param conferenceFolder The conference folder.
-     * @param fileName The name of the file.
-     * @throws IOException When I/O error occurs.
-     */
-    private static void writeTalk(WebElement bodyBlockDiv, File conferenceFolder, String fileName) throws IOException {
-        final File file = new File(conferenceFolder, fileName);
-        if (!file.createNewFile()) {
-            throw new RuntimeException("Unable to create talk file: `" + file.getPath() + "`.");
-        }
-        if (!file.canWrite() && !file.setWritable(true)) {
-            throw new RuntimeException("Unable to write to talk file: `" + file.getPath() + "`.");
-        }
-        final OutputStream outputStream = new FileOutputStream(file);
-        final PrintStream out = new PrintStream(outputStream);
-        // Get every top-level child of the `body-block` `div`.
-        // We do this because `section`s and `p`s can be interspersed within a talk.
-        writeChildElements(bodyBlockDiv, out, file);
-        out.close();
-        outputStream.close();
-    }
-
-    private static void writeChildElements(WebElement element, PrintStream out, File file) {
-        writeChildElements(element, out, file, "");
-    }
-
-    private static void writeChildElements(WebElement element, PrintStream out, File file, String start) {
+    private static void writeChildElementsOrSelf(WebElement element, PrintStream out, String start, String end) {
         final List<WebElement> children = element.findElements(By.xpath("./*"));
-        for (WebElement child : children) {
-            writeChildElement(child, out, file, start);
+        if (children.size() > 0 && !areAllFormatting(children)) {
+            for (WebElement child : children) {
+                writeChildElement(child, out, start, end);
+            }
+        } else {
+            writeEncoded(element, out, start, end);
         }
     }
 
-    private static void writeChildElement(WebElement child, PrintStream out, File file, String start) {
+    private static final Set<String> FORMATTING_TAGS = new HashSet<String>();
+    static {
+        FORMATTING_TAGS.add("b");
+        FORMATTING_TAGS.add("i");
+        FORMATTING_TAGS.add("strong");
+        FORMATTING_TAGS.add("em");
+        FORMATTING_TAGS.add("a");
+        // Superscripts should always be within an `a` element as a reference.
+//        FORMATTING_TAGS.add("sup");
+    }
+
+    private static boolean areAllFormatting(List<WebElement> elements) {
+        for (WebElement element : elements) {
+            final String tagName = element.getTagName();
+            if (!FORMATTING_TAGS.contains(tagName)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    private static void writeChildElement(WebElement child, PrintStream out, String start, String end) {
+        // TODO: Check if any text is being lost due to text outside of a non-formatting child element:
+        // <div>Some text outside of a child paragraph element.
+        //   <p>Some text inside of a paragraph element.</p>
+        // </div>
+        // Determine what to write based on this element's tag.
         final String tagName = child.getTagName();
         if ("p".equals(tagName)) {
-            // We assume that a `p` doesn't contain any nested paragraphs.
-            writeEncoded(child, out, start);
+            // We assume that a `p` doesn't contain any non-formatting child elements.
+            writeEncoded(child, out, start, end);
+        } else if ("h2".equals(tagName) || "h3".equals(tagName)) {
+            // See `https://www.lds.org/languages/eng/content/general-conference/2017/10/exceeding-great-and-precious-promises`.
+            // We assume that an `h#` doesn't contain any non-formatting child elements.
+            writeEncoded(child, out, Encoding.HEADER_START, Encoding.HEADER_END);
         } else if ("header".equals(tagName)) {
             // Write the encoded header text.
-            writeEncoded(child, out, Encoding.SECTION_START, Encoding.SECTION_END);
+            // A `header` may or may not have child elements.
+            writeChildElementsOrSelf(child, out, Encoding.HEADER_START, Encoding.HEADER_END);
         } else if ("section".equals(tagName)) {
             // This child is a `section`, most likely containing a header.
-            // For example, `https://www.lds.org/languages/eng/content/general-conference/2018/04/small-and-simple-things`.
-            writeChildElements(child, out, file);
+            // See `https://www.lds.org/languages/eng/content/general-conference/2018/04/teaching-in-the-home-a-joyful-and-sacred-responsibility`.
+            // See `https://www.lds.org/languages/eng/content/general-conference/2018/04/small-and-simple-things`.
+            writeChildElementsOrSelf(child, out, start, end);
         } else if ("ul".equals(tagName)) {
-            writeChildElements(child, out, file, Encoding.UNORDERED_LIST_ITEM);
+            writeChildElementsOrSelf(child, out, start, end);
         } else if ("ol".equals(tagName)) {
-            writeChildElements(child, out, file, Encoding.ORDERED_LIST_ITEM);
+            // See `https://www.lds.org/languages/eng/content/general-conference/1998/04/in-harms-way`.
+            // In the case above, a `li` contains a poetry `div`.
+            writeChildElementsOrSelf(child, out, start, end);
         } else if ("li".equals(tagName)) {
-            // A `li` may or may not have nested elements.
-            final List<WebElement> liChildren = child.findElements(By.xpath("./*"));
-            if (liChildren.size() > 0) {
-                for (WebElement liChild : liChildren) {
-                    // Assume that they're all `p` elements.
-                    if ("p".equals(liChild.getTagName())) {
-                        writeEncoded(liChild, out, start);
-                    } else {
-                        System.out.println("Unknown HTML element in <li>: `" + liChild.getTagName() + "` in `" + file.getPath() + "`.");
-                    }
-                }
-            } else {
-                writeEncoded(child, out, start);
-            }
+            // A `li` element may or may not have child elements.
+            // If it does, they are usually `p`s.
+            writeChildElementsOrSelf(child, out, start, end);
+        } else if ("table".equals(tagName) ||
+                "tbody".equals(tagName) ||
+                "td".equals(tagName)) {
+            // Usually statistical reports.
+            // Don't bother with any special formatting.
+            // See `https://www.lds.org/languages/eng/content/general-conference/2017/04/statistical-report-2016`.
+            writeChildElementsOrSelf(child, out, start, end);
+        } else if ("tr".equals(tagName)) {
+            // Each `td` of a `tr` could be written on the same line, but for now we don't.
+            writeChildElementsOrSelf(child, out, start, end);
         } else if ("div".equals(tagName)) {
             // This could be a `poetry` div.
-            // For example, `https://www.lds.org/languages/eng/content/general-conference/2018/04/small-and-simple-things`.
+            // See `https://www.lds.org/languages/eng/content/general-conference/2018/04/small-and-simple-things`.
             // For now, ignore any special `div` formatting.
-            writeChildElements(child, out, file, start);
+            writeChildElementsOrSelf(child, out, start, end);
             // It could also be an `img` placeholder, in which case its only child element should be a `noscript`.
-        } else if ("img".equals(tagName)) {
-            // Save this image's properties. It may be useful later.
-            final String outerHtml = child.getAttribute("outerHTML").trim();
-            final String outerText = encode(outerHtml);
-            out.println(start + outerText);
+        } else if ("img".equals(tagName) ||
+                "video".equals(tagName)) {
+            // Ignore.
         } else if ("noscript".equals(tagName)) {
             // Usually a placeholder for an `img`.
             // If we scroll down, the `img` would load, but ChromeDriver has issues scrolling these pages.
             // The inner content of the `noscript` seems to be the same as the loaded `img`, anyway.
-            final String text = child.getAttribute("innerHTML").trim();
-            final String divStart = "<div>";
-            final String divEnd = "</div>";
-            final String encodedText;
-            if (text.startsWith(divStart) && text.endsWith(divEnd)) {
-                encodedText = encode(text.substring(divStart.length(), text.length() - divEnd.length()));
-            } else {
-                encodedText = encode(text);
-            }
-            out.println(encodedText);
-        } else {
-            // `table`, `video`, `figure`, etc.
-            // See `https://www.lds.org/languages/eng/content/general-conference/2017/04/statistical-report-2016`.
+            // Ignore.
+        } else if ("figure".equals(tagName)) {
+            // Usually contains an `img` and a `p` as the caption.
             // See `https://www.lds.org/languages/eng/content/general-conference/2014/10/joseph-smith`.
-            System.out.println("Unrecognized HTML tag `" + tagName + "` in `" + file.getPath() + "`.");
-            // Deal with this later.
-            final String outerHtml = child.getAttribute("outerHTML").trim();
-            final String outerText = encode(outerHtml);
-            out.println(start + outerText);
+            writeChildElementsOrSelf(child, out, start, end);
+        } else {
+            System.out.println("Unrecognized HTML tag `" + tagName + "`.");
         }
-    }
-
-    private static void writeEncoded(WebElement element, PrintStream out, String start) {
-        writeEncoded(element, out, start, "");
     }
 
     private static void writeEncoded(WebElement element, PrintStream out, String start, String end) {
         final String html = element.getAttribute("innerHTML").trim();
         final String text = encode(html);
-        out.println(start + text + end);
+        out.print(start);
+        out.print(text);
+        out.print(end);
+        out.println();
     }
 
     /**
      * Encode reference numbers.
      * @param html Inner HTML from a paragraph of a talk.
-     * @return A more readable text representation of a `p` element's inner HTML.
+     * @return A more readable text representation of a `p`, `header`, `h2`, or `li` element's inner HTML.
      */
     private static String encode(String html) {
         // Replace the superscript reference notation with double arrow brackets.
-        // For now, retain any other HTML tags, e.g. links, italics.
         return html.replaceAll("<a class=\"note-ref\" href=\"#note([0-9]+)\"><sup class=\"marker\">\\1</sup></a>",
-                Encoding.REFERENCE_NUMBER_START + "$1" + Encoding.REFERENCE_NUMBER_END);
+                Encoding.REFERENCE_NUMBER_START + "$1" + Encoding.REFERENCE_NUMBER_END)
+                // Ignore other HTML formatting tags, e.g. links, italics.
+                .replaceAll("<([-a-zA-Z0-9]+).*?>(.*?)</\\1>", "$2")
+                // Ignore self-closing tags.
+                .replaceAll("<[^>]+?/>", "");
     }
 
     /**

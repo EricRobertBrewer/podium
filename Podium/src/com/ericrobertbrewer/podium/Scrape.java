@@ -50,11 +50,11 @@ public final class Scrape {
         }
         // Scrape the web content.
         System.out.println("Scraping: " + contentOption.description);
-        System.out.println("Using driver: " + driverOption.description);
         System.out.println("To directory: " + rootFolder.getPath());
+        System.out.println("Using driver: " + driverOption.description);
         scraper.scrapeAll(rootFolder, force);
         scraper.quit();
-        System.out.println("Scrape complete.");
+        System.out.println("Complete.");
     }
 
     private static abstract class ContentOption {

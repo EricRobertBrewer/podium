@@ -19,6 +19,14 @@ public class ByuSpeechesScraper extends Scraper {
 
     public void scrapeAll(File rootFolder, boolean force) {
         getDriver().navigate().to("https://speeches.byu.edu/talks/");
+        // Write the page source.
+        final String sourceFileName = "root.html";
+        try {
+            writeSource(rootFolder, sourceFileName, force);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        // Write each year.
         final List<String> years = new ArrayList<String>();
         final WebElement yearSelect = getDriver().findElement(By.id("speech-date-archive__year-selection"));
         final List<WebElement> yearOptions = yearSelect.findElements(By.tagName("option"));
@@ -40,18 +48,19 @@ public class ByuSpeechesScraper extends Scraper {
         if (folder.exists()) {
             if (force) {
                 FileUtils.deleteDirectory(folder);
-                createYearFolder(folder);
             } else {
                 return;
             }
-        } else {
-            createYearFolder(folder);
+        }
+        if (!folder.mkdirs()) {
+            throw new RuntimeException("Unable to create year folder: `" + folder.getPath() + "`.");
         }
         // Navigate to the URL, if necessary.
         final String url = "https://speeches.byu.edu/talks/" + year + "/";
         if (!url.equals(getDriver().getCurrentUrl())) {
             getDriver().navigate().to(url);
         }
+        System.out.println("Starting year `" + year + "`.");
         // Scroll down a few times, each time waiting for a tenth of a second, then wait again.
         // This tends to help load all of the talks.
         DriverUtils.scrollDown(getDriver(), 25, 100L);
@@ -60,6 +69,9 @@ public class ByuSpeechesScraper extends Scraper {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        // Write the page source for this year.
+        final String sourceFileName = "year.html";
+        writeSource(folder, sourceFileName, force);
         // Create the summary file. Write the column headers.
         final File summaryFile = new File(folder, "summary.tsv");
         if (!summaryFile.createNewFile()) {
@@ -70,7 +82,7 @@ public class ByuSpeechesScraper extends Scraper {
         }
         final OutputStream summaryOutputStream = new FileOutputStream(summaryFile);
         final PrintStream summaryOut = new PrintStream(summaryOutputStream);
-        summaryOut.println("title\tspeaker\tposition\tdate\ttype\ttopics\tfile\tnotes_file\turl");
+        summaryOut.println("title\tspeaker\tposition\tdate\ttype\ttopics\ttext\tnotes\turl\tsource");
         // Extract talk urls, titles, speakers, dates if available.
         final List<String> talkUrls = new ArrayList<String>();
         final List<String> titles = new ArrayList<String>();
@@ -89,9 +101,9 @@ public class ByuSpeechesScraper extends Scraper {
             titles.add(title);
             // Extract speaker and date.
             final WebElement bylineSpan = rightDiv.findElement(By.className("image-excerpt-media-listing-block__byline"));
-            final String speaker = DriverUtils.getElementTextOrEmpty(bylineSpan, By.className("image-excerpt-media-listing-block__speaker")).trim();
+            final String speaker = DriverUtils.getTextOrEmpty(bylineSpan, By.className("image-excerpt-media-listing-block__speaker")).trim();
             speakers.add(speaker);
-            final String date = DriverUtils.getElementTextOrEmpty(bylineSpan, By.className("image-excerpt-media-listing-block__date")).trim();
+            final String date = DriverUtils.getTextOrEmpty(bylineSpan, By.className("image-excerpt-media-listing-block__date")).trim();
             dates.add(date);
         }
         for (int i = 0; i < talkUrls.size(); i++) {
@@ -105,10 +117,18 @@ public class ByuSpeechesScraper extends Scraper {
         summaryOutputStream.close();
     }
 
-    private void scrapeSpeech(File folder, String url, String title, String speaker, String date, PrintStream summaryOut) throws IOException {
+    private void scrapeSpeech(File folder, String url, String title, String speaker, String date, PrintStream summaryOut) {
         // Navigate to this talk, if needed.
         if (!getDriver().getCurrentUrl().equals(url)) {
             getDriver().navigate().to(url);
+        }
+        System.out.println("Starting speech `" + title + "`.");
+        final String fileNameBase = getFileNameBase(url);
+        final String sourceFileName = fileNameBase + ".html";
+        try {
+            writeSource(folder, sourceFileName);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
         final String position;
         final String type;
@@ -119,8 +139,8 @@ public class ByuSpeechesScraper extends Scraper {
         if (main != null) {
             // Extract position and type.
             final WebElement metaSection = main.findElement(By.className("section__speech-meta"));
-            position = DriverUtils.getElementTextOrEmpty(metaSection, By.className("speech__speaker-position")).trim();
-            final String dateAndType = DriverUtils.getElementTextOrEmpty(metaSection, By.className("speech__date"));
+            position = DriverUtils.getTextOrEmpty(metaSection, By.className("speech__speaker-position")).trim();
+            final String dateAndType = DriverUtils.getTextOrEmpty(metaSection, By.className("speech__date"));
             final String[] dateAndTypeParts = dateAndType.split("•");
             if (dateAndTypeParts.length > 1) {
                 type = dateAndTypeParts[1].trim();
@@ -130,26 +150,9 @@ public class ByuSpeechesScraper extends Scraper {
             // Extract talk.
             final WebElement bodyDiv = DriverUtils.findElementOrNull(getDriver(), By.className("body-copy__standard"));
             if (bodyDiv != null) {
-                final String fileNameBase = getFileNameBase(url);
-                // Create the speech file.
                 fileName = fileNameBase + ".txt";
-                final File file = new File(folder, fileName);
-                if (!file.createNewFile()) {
-                    throw new RuntimeException("Unable to create speech file: `" + file.getPath() + "`.");
-                }
-                if (!file.canWrite() && !file.setWritable(true)) {
-                    throw new RuntimeException("Unable to write to speech file: `" + file.getPath() + "`.");
-                }
-                // Create the notes file.
                 notesFileName = fileNameBase + "_notes.tsv";
-                final File notesFile = new File(folder, notesFileName);
-                if (!notesFile.createNewFile()) {
-                    throw new RuntimeException("Unable to create notes file: `" + notesFile.getPath() + "`.");
-                }
-                if (!notesFile.canWrite() && !notesFile.setWritable(true)) {
-                    throw new RuntimeException("Unable to write to notes file: `" + notesFile.getPath() + "`.");
-                }
-                topics = writeSpeechAndNotes(bodyDiv, file, notesFile);
+                topics = getTopicsAndWriteSpeechAndNotes(bodyDiv, folder, fileName, notesFileName);
             } else {
                 // The page doesn't have a body content section.
                 topics = "";
@@ -158,7 +161,8 @@ public class ByuSpeechesScraper extends Scraper {
             }
         } else {
             // The link is most likely broken.
-            // For example, `https://speeches.byu.edu/talks/%first_names%-%last_name%_challenges-mission-brigham-young-university/`.
+            // See `https://speeches.byu.edu/talks/%first_names%-%last_name%_challenges-mission-brigham-young-university/`.
+            // On the page `https://speeches.byu.edu/talks/2017/`.
             position = "";
             type = "";
             topics = "";
@@ -168,20 +172,46 @@ public class ByuSpeechesScraper extends Scraper {
         // Write to summary file.
         summaryOut.print(title + "\t" + speaker + "\t" + position + "\t" + date + "\t" + type + "\t" + topics);
         summaryOut.print("\t" + fileName + "\t" + notesFileName);
-        summaryOut.print("\t" + url);
+        summaryOut.print("\t" + url + "\t" + sourceFileName);
         summaryOut.println();
+    }
+
+    private String getTopicsAndWriteSpeechAndNotes(WebElement bodyDiv, File folder, String fileName, String notesFileName) {
+        try {
+            return writeSpeechAndNotes(bodyDiv, folder, fileName, notesFileName);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return "";
     }
 
     /**
      * Write this speech and its notes.
      * @param bodyDiv The container `div` which is the direct parent of all of the relevant `p`s and `h2`s.
-     * @param file Of the speech.
-     * @param notesFile Of the notes of the speech.
+     * @param folder Of the year.
+     * @param fileName Of the speech.
+     * @param notesFileName Of the notes of the speech.
      * @return The list of topics assigned to this speech.
      * @throws IOException When I/O error occurs.
      */
     @SuppressWarnings("StringConcatenationInLoop")
-    private String writeSpeechAndNotes(WebElement bodyDiv, File file, File notesFile) throws IOException {
+    private String writeSpeechAndNotes(WebElement bodyDiv, File folder, String fileName, String notesFileName) throws IOException {
+        // Create the speech file.
+        final File file = new File(folder, fileName);
+        if (!file.createNewFile()) {
+            throw new RuntimeException("Unable to create speech file: `" + file.getPath() + "`.");
+        }
+        if (!file.canWrite() && !file.setWritable(true)) {
+            throw new RuntimeException("Unable to write to speech file: `" + file.getPath() + "`.");
+        }
+        // Create the notes file.
+        final File notesFile = new File(folder, notesFileName);
+        if (!notesFile.createNewFile()) {
+            throw new RuntimeException("Unable to create notes file: `" + notesFile.getPath() + "`.");
+        }
+        if (!notesFile.canWrite() && !notesFile.setWritable(true)) {
+            throw new RuntimeException("Unable to write to notes file: `" + notesFile.getPath() + "`.");
+        }
         final OutputStream outputStream = new FileOutputStream(file);
         final PrintStream out = new PrintStream(outputStream);
         final OutputStream notesOutputStream = new FileOutputStream(notesFile);
@@ -232,16 +262,11 @@ public class ByuSpeechesScraper extends Scraper {
                         notesOut.print("||" + pHtml);
                     }
                 }
-            } else if ("h2".equals(tagName)) {
+            } else if ("h2".equals(tagName) || "h3".equals(tagName)) {
                 assert !hasReachedNotes;
-                final String h2Html = child.getAttribute("innerHTML");
-                final String h2Text = encode(h2Html);
-                out.println(Encoding.SECTION_START + h2Text + Encoding.SECTION_END);
-            } else if ("h3".equals(tagName)) {
-                assert !hasReachedNotes;
-                final String h3Html = child.getAttribute("innerHTML");
-                final String h3Text = encode(h3Html);
-                out.println(Encoding.SUBSECTION_START + h3Text + Encoding.SUBSECTION_END);
+                final String hHtml = child.getAttribute("innerHTML");
+                final String hText = encode(hHtml);
+                out.println(Encoding.HEADER_START + hText + Encoding.HEADER_END);
             } else if ("div".equals(tagName)) {
                 // A `div` is usually a related topics/talks sections.
                 if ("related_topics_and_talks".equals(className)) {
@@ -257,19 +282,12 @@ public class ByuSpeechesScraper extends Scraper {
                         }
                     }
                 }
-            } else if ("ul".equals(tagName)) {
+            } else if ("ul".equals(tagName) || "ol".equals(tagName)) {
                 final List<WebElement> lis = child.findElements(By.tagName("li"));
                 for (WebElement li : lis) {
                     final String liHtml = li.getAttribute("innerHTML");
                     final String liText = encode(liHtml);
-                    out.println(Encoding.UNORDERED_LIST_ITEM + liText);
-                }
-            } else if ("ol".equals(tagName)) {
-                final List<WebElement> lis = child.findElements(By.tagName("li"));
-                for (WebElement li : lis) {
-                    final String liHtml = li.getAttribute("innerHTML");
-                    final String liText = encode(liHtml);
-                    out.println(Encoding.ORDERED_LIST_ITEM + liText);
+                    out.println(liText);
                 }
             } else if ("i".equals(tagName)) {
                 // For example, `https://speeches.byu.edu/talks/dilworth-b-parkinson_received-need/`.
@@ -294,12 +312,6 @@ public class ByuSpeechesScraper extends Scraper {
         return topics;
     }
 
-    private static void createYearFolder(File folder) {
-        if (!folder.mkdirs()) {
-            throw new RuntimeException("Unable to create year folder: `" + folder.getPath() + "`.");
-        }
-    }
-
     private static String getFileNameBase(String url) {
         if (url.endsWith("/")) {
             return getFileNameBase(url.substring(0, url.length() - 1));
@@ -309,8 +321,11 @@ public class ByuSpeechesScraper extends Scraper {
 
     private static String encode(String html) {
         // Encode note reference super-scripts as `<<#>>`.
-        // For now, leave all other sub-tags.
         return html.replaceAll("<sup>([0-9]+)</sup>",
-                Encoding.REFERENCE_NUMBER_START + "$1" + Encoding.REFERENCE_NUMBER_END);
+                Encoding.REFERENCE_NUMBER_START + "$1" + Encoding.REFERENCE_NUMBER_END)
+                // Ignore all other HTML formatting tags (links, italics, etc.).
+                .replaceAll("<([-a-zA-Z0-9]+).*?>(.*?)</\\1>", "$2")
+                // Ignore self-closing tags.
+                .replaceAll("<[^>]+?/>", "");
     }
 }
