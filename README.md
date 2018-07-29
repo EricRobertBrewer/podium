@@ -7,3 +7,12 @@ Collect, organize, and make available LDS talks, devotional messages, firesides,
 ```
 npm install
 ```
+
+## Usage
+
+For example:
+
+```
+gc chrome /Users/myusername/Code/web/drivers/chromedriver false
+byu firefox /Users/brewer/Code/web/drivers/geckodriver false
+```
