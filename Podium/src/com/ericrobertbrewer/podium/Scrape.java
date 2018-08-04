@@ -110,7 +110,7 @@ public final class Scrape {
             }
     };
 
-    private static final Map<String, ContentOption> CONTENT_OPTION_MAP = new HashMap<String, ContentOption>();
+    private static final Map<String, ContentOption> CONTENT_OPTION_MAP = new HashMap<>();
     static {
         for (ContentOption contentOption : CONTENT_OPTIONS) {
             CONTENT_OPTION_MAP.put(contentOption.name, contentOption);
@@ -153,7 +153,7 @@ public final class Scrape {
             }
     };
 
-    private static final Map<String, DriverOption> DRIVER_OPTION_MAP = new HashMap<String, DriverOption>();
+    private static final Map<String, DriverOption> DRIVER_OPTION_MAP = new HashMap<>();
     static {
         for (DriverOption driverOption : DRIVER_OPTIONS) {
             DRIVER_OPTION_MAP.put(driverOption.name, driverOption);

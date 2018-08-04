@@ -29,8 +29,8 @@ public class GeneralConferenceScraper extends Scraper {
         }
         // TODO: Download giant images for conferences - `tileRow-3ETk4`.
         // Collect conference URLs before navigating away from this page.
-        final List<String> urls = new ArrayList<String>();
-        final List<String> titles = new ArrayList<String>();
+        final List<String> urls = new ArrayList<>();
+        final List<String> titles = new ArrayList<>();
         final List<WebElement> tileAs = getDriver().findElements(By.className("tile-3KqhL"));
         for (WebElement tileA : tileAs) {
             // Extract link.
@@ -88,9 +88,9 @@ public class GeneralConferenceScraper extends Scraper {
         final PrintStream programOut = new PrintStream(programOutputStream);
         programOut.println("title\tspeaker\trole\tkicker\ttext\treferences\turl\tsource");
         // Collect talk URLs before navigating.
-        final List<String> talkUrls = new ArrayList<String>();
-        final List<String> talkTitles = new ArrayList<String>();
-        final List<String> speakers = new ArrayList<String>();
+        final List<String> talkUrls = new ArrayList<>();
+        final List<String> talkTitles = new ArrayList<>();
+        final List<String> speakers = new ArrayList<>();
         final WebElement talksListDiv = getDriver().findElement(By.className("items-21msL"));
         final List<WebElement> talkAs = talksListDiv.findElements(By.tagName("a"));
         for (WebElement talkA : talkAs) {
@@ -367,7 +367,7 @@ public class GeneralConferenceScraper extends Scraper {
         }
     }
 
-    private static final Set<String> FORMATTING_TAGS = new HashSet<String>();
+    private static final Set<String> FORMATTING_TAGS = new HashSet<>();
     static {
         FORMATTING_TAGS.add("b");
         FORMATTING_TAGS.add("i");

@@ -27,7 +27,7 @@ public class ByuSpeechesScraper extends Scraper {
             e.printStackTrace();
         }
         // Write each year.
-        final List<String> years = new ArrayList<String>();
+        final List<String> years = new ArrayList<>();
         final WebElement yearSelect = getDriver().findElement(By.id("speech-date-archive__year-selection"));
         final List<WebElement> yearOptions = yearSelect.findElements(By.tagName("option"));
         for (WebElement yearOption : yearOptions) {
@@ -84,10 +84,10 @@ public class ByuSpeechesScraper extends Scraper {
         final PrintStream summaryOut = new PrintStream(summaryOutputStream);
         summaryOut.println("title\tspeaker\tposition\tdate\ttype\ttopics\ttext\tnotes\turl\tsource");
         // Extract talk urls, titles, speakers, dates if available.
-        final List<String> talkUrls = new ArrayList<String>();
-        final List<String> titles = new ArrayList<String>();
-        final List<String> speakers = new ArrayList<String>();
-        final List<String> dates = new ArrayList<String>();
+        final List<String> talkUrls = new ArrayList<>();
+        final List<String> titles = new ArrayList<>();
+        final List<String> speakers = new ArrayList<>();
+        final List<String> dates = new ArrayList<>();
         final WebElement listDiv = getDriver().findElement(By.id("speech-date-archive-listing__talks-list"));
         final List<WebElement> listItems = listDiv.findElements(By.tagName("li"));
         for (WebElement listItem : listItems) {
