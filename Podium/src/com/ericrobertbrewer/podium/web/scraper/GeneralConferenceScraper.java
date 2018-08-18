@@ -77,13 +77,7 @@ public class GeneralConferenceScraper extends Scraper {
         // Each individual talk has a complete navigation pane (there is no page which only contains the list of talks).
         // For this reason, we do not save the page source for each conference root.
         // Create the program file. Write the column headers.
-        final File programFile = new File(folder, "program.tsv");
-        if (!programFile.createNewFile()) {
-            throw new RuntimeException("Unable to create program file in `" + folder.getName() + "`.");
-        }
-        if (!programFile.canWrite() && !programFile.setWritable(true)) {
-            throw new RuntimeException("Unable to write to program file: `" + programFile.getPath() + "`.");
-        }
+        final File programFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(folder, "program.tsv");
         final OutputStream programOutputStream = new FileOutputStream(programFile);
         final PrintStream programOut = new PrintStream(programOutputStream);
         programOut.println("title\tspeaker\trole\tkicker\ttext\treferences\turl\tsource");
@@ -247,13 +241,7 @@ public class GeneralConferenceScraper extends Scraper {
      * @throws IOException When I/O error occurs.
      */
     private void writeReferences(WebElement referencesSection, File conferenceFolder, String referencesFileName) throws IOException {
-        final File referencesFile = new File(conferenceFolder, referencesFileName);
-        if (!referencesFile.createNewFile()) {
-            throw new RuntimeException("Unable to create references file: `" + referencesFile.getPath() + "`.");
-        }
-        if (!referencesFile.canWrite() && !referencesFile.setWritable(true)) {
-            throw new RuntimeException("Unable to write to references file: `" + referencesFile.getPath() + "`.");
-        }
+        final File referencesFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(conferenceFolder, referencesFileName);
         final OutputStream outputStream = new FileOutputStream(referencesFile);
         final PrintStream out = new PrintStream(outputStream);
         // Print header.
@@ -303,13 +291,7 @@ public class GeneralConferenceScraper extends Scraper {
      * @throws IOException When I/O error occurs.
      */
     private void writeText(WebElement bodyBlockDiv, File conferenceFolder, String fileName) throws IOException {
-        final File file = new File(conferenceFolder, fileName);
-        if (!file.createNewFile()) {
-            throw new RuntimeException("Unable to create text file: `" + file.getPath() + "`.");
-        }
-        if (!file.canWrite() && !file.setWritable(true)) {
-            throw new RuntimeException("Unable to write to text file: `" + file.getPath() + "`.");
-        }
+        final File file = com.ericrobertbrewer.podium.web.FileUtils.newFile(conferenceFolder, fileName);
         final OutputStream outputStream = new FileOutputStream(file);
         final PrintStream out = new PrintStream(outputStream);
         // Get every top-level child of the `body-block` `div`.

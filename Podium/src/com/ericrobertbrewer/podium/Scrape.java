@@ -72,37 +72,37 @@ public final class Scrape {
     }
 
     private static final ContentOption[] CONTENT_OPTIONS = {
-            new ContentOption("byu", "BYU Provo Speeches", Folders.CONTENT_BYU_SPEECHES) {
+            new ContentOption("byu", "BYU Provo Speeches", Folders.SPEECHES_BYU) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new ByuSpeechesScraper(driver);
                 }
             },
-            new ContentOption("byuh", "BYU Hawai'i Speeches", Folders.CONTENT_BYUH_SPEECHES) {
+            new ContentOption("byuh", "BYU Hawai'i Speeches", Folders.SPEECHES_BYUH) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new ByuhSpeechesScraper(driver);
                 }
             },
-            new ContentOption("byui", "BYU Idaho Speeches", Folders.CONTENT_BYUI_SPEECHES) {
+            new ContentOption("byui", "BYU Idaho Speeches", Folders.SPEECHES_BYUI) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new ByuiSpeechesScraper(driver);
                 }
             },
-            new ContentOption("xmas", "Christmas Devotionals", Folders.CONTENT_CHRISTMAS_DEVOTIONALS) {
+            new ContentOption("xmas", "Christmas Devotionals", Folders.SPEECHES_CHRISTMAS_DEVOTIONALS) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new ChristmasDevotionalsScraper(driver);
                 }
             },
-            new ContentOption("gc", "General Conference Talks", Folders.CONTENT_GENERAL_CONFERENCE) {
+            new ContentOption("gc", "General Conference Talks", Folders.SPEECHES_GENERAL_CONFERENCE) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new GeneralConferenceScraper(driver);
                 }
             },
-            new ContentOption("jtc", "Jesus the Christ Chapters", Folders.CONTENT_JESUS_THE_CHRIST) {
+            new ContentOption("jtc", "Jesus the Christ Chapters", Folders.BOOKS_JESUS_THE_CHRIST) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new JesusTheChristScraper(driver);

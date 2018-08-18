@@ -73,13 +73,7 @@ public class ByuSpeechesScraper extends Scraper {
         final String sourceFileName = "year.html";
         writeSource(folder, sourceFileName, force);
         // Create the summary file. Write the column headers.
-        final File summaryFile = new File(folder, "summary.tsv");
-        if (!summaryFile.createNewFile()) {
-            throw new RuntimeException("Unable to create summary file in `" + folder.getName() + "`.");
-        }
-        if (!summaryFile.canWrite() && !summaryFile.setWritable(true)) {
-            throw new RuntimeException("Unable to write to summary file: `" + summaryFile.getPath() + "`.");
-        }
+        final File summaryFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(folder, "summary.tsv");
         final OutputStream summaryOutputStream = new FileOutputStream(summaryFile);
         final PrintStream summaryOut = new PrintStream(summaryOutputStream);
         summaryOut.println("title\tspeaker\tposition\tdate\ttype\ttopics\ttext\tnotes\turl\tsource");
@@ -197,23 +191,11 @@ public class ByuSpeechesScraper extends Scraper {
     @SuppressWarnings("StringConcatenationInLoop")
     private String writeSpeechAndNotes(WebElement bodyDiv, File folder, String fileName, String notesFileName) throws IOException {
         // Create the speech file.
-        final File file = new File(folder, fileName);
-        if (!file.createNewFile()) {
-            throw new RuntimeException("Unable to create speech file: `" + file.getPath() + "`.");
-        }
-        if (!file.canWrite() && !file.setWritable(true)) {
-            throw new RuntimeException("Unable to write to speech file: `" + file.getPath() + "`.");
-        }
-        // Create the notes file.
-        final File notesFile = new File(folder, notesFileName);
-        if (!notesFile.createNewFile()) {
-            throw new RuntimeException("Unable to create notes file: `" + notesFile.getPath() + "`.");
-        }
-        if (!notesFile.canWrite() && !notesFile.setWritable(true)) {
-            throw new RuntimeException("Unable to write to notes file: `" + notesFile.getPath() + "`.");
-        }
+        final File file = com.ericrobertbrewer.podium.web.FileUtils.newFile(folder, fileName);
         final OutputStream outputStream = new FileOutputStream(file);
         final PrintStream out = new PrintStream(outputStream);
+        // Create the notes file.
+        final File notesFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(folder, notesFileName);
         final OutputStream notesOutputStream = new FileOutputStream(notesFile);
         final PrintStream notesOut = new PrintStream(notesOutputStream);
         notesOut.println("id\tnote");
@@ -313,16 +295,12 @@ public class ByuSpeechesScraper extends Scraper {
     }
 
     private static String getFileNameBase(String url) {
-        if (url.endsWith("/")) {
-            return getFileNameBase(url.substring(0, url.length() - 1));
-        }
-        return url.substring(url.lastIndexOf('/') + 1);
+        return DriverUtils.getLastComponent(url);
     }
 
     private static String encode(String html) {
         // Encode note reference super-scripts as `<<#>>`.
-        return html.replaceAll("<sup>([0-9]+)</sup>",
-                Encoding.REFERENCE_NUMBER_START + "$1" + Encoding.REFERENCE_NUMBER_END)
+        return html.replaceAll("<sup>([0-9]+)</sup>", Encoding.REFERENCE_NUMBER_START + "$1" + Encoding.REFERENCE_NUMBER_END)
                 // Ignore all other HTML formatting tags (links, italics, etc.).
                 .replaceAll("<([-a-zA-Z0-9]+).*?>(.*?)</\\1>", "$2")
                 // Ignore self-closing tags.

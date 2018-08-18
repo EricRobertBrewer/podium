@@ -3,17 +3,29 @@ package com.ericrobertbrewer.podium;
 import java.io.File;
 
 public class Folders {
+    
+    private static final String SLASH = File.separator;
 
-    public static final String CONTENT_ROOT = ".." + File.separator + "content" + File.separator;
-    public static final String CONTENT_BYU_SPEECHES = CONTENT_ROOT + "byu-speeches" + File.separator;
-    public static final String CONTENT_BYUH_SPEECHES = CONTENT_ROOT + "byuh-speeches" + File.separator;
-    public static final String CONTENT_BYUI_SPEECHES = CONTENT_ROOT + "byui-speeches" + File.separator;
-    public static final String CONTENT_CHRISTMAS_DEVOTIONALS = CONTENT_ROOT + "christmas-devotionals" + File.separator;
-    public static final String CONTENT_GENERAL_CONFERENCE = CONTENT_ROOT + "general-conference" + File.separator;
-    public static final String CONTENT_JESUS_THE_CHRIST = CONTENT_ROOT + "jesus-the-christ" + File.separator;
+    /**
+     * Root of downloaded (scraped) content.
+     */
+    private static final String CONTENT_ROOT = ".." + SLASH + "content" + SLASH;
 
-    public static final String NODE_MODULES_ROOT = ".." + File.separator + "node_modules" + File.separator;
-    public static final String SCRIPTURES_ROOT = NODE_MODULES_ROOT + "@bencrowder" + File.separator + "scriptures-json" + File.separator;
+    /**
+     * Folder for speeches and devotional messages.
+     */
+    private static final String SPEECHES_ROOT = CONTENT_ROOT + "speeches" + SLASH;
+    public static final String SPEECHES_BYU = SPEECHES_ROOT + "byu" + SLASH;
+    public static final String SPEECHES_BYUH = SPEECHES_ROOT + "byuh" + SLASH;
+    public static final String SPEECHES_BYUI = SPEECHES_ROOT + "byui" + SLASH;
+    public static final String SPEECHES_CHRISTMAS_DEVOTIONALS = SPEECHES_ROOT + "christmas-devotionals" + SLASH;
+    public static final String SPEECHES_GENERAL_CONFERENCE = SPEECHES_ROOT + "general-conference" + SLASH;
+    
+    private static final String BOOKS_ROOT = CONTENT_ROOT + "books" + SLASH;
+    public static final String BOOKS_JESUS_THE_CHRIST = BOOKS_ROOT + "jesus-the-christ" + SLASH;
+
+    private static final String NODE_MODULES_ROOT = ".." + SLASH + "node_modules" + SLASH;
+    public static final String SCRIPTURES_ROOT = NODE_MODULES_ROOT + "@bencrowder" + SLASH + "scriptures-json" + SLASH;
 
     private Folders() {
     }
