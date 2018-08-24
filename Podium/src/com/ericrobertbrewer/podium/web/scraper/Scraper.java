@@ -17,6 +17,7 @@ public abstract class Scraper {
         return driver;
     }
 
+    // TODO: Separate `scrapeText` from `scrapeAudio`? Audio is slow to download...
     public abstract void scrapeAll(File rootFolder, boolean force);
 
     public void close() {
