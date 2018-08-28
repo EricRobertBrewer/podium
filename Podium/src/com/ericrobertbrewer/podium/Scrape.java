@@ -72,19 +72,19 @@ public final class Scrape {
     }
 
     private static final ContentOption[] CONTENT_OPTIONS = {
-            new ContentOption("byu", "BYU Provo Speeches", Folders.SPEECHES_BYU) {
+            new ContentOption("byu", "BYU Speeches", Folders.SPEECHES_BYU) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new ByuSpeechesScraper(driver);
                 }
             },
-            new ContentOption("byuh", "BYU Hawai'i Speeches", Folders.SPEECHES_BYUH) {
+            new ContentOption("byuh", "BYU-Hawai'i Speeches", Folders.SPEECHES_BYUH) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new ByuhSpeechesScraper(driver);
                 }
             },
-            new ContentOption("byui", "BYU Idaho Speeches", Folders.SPEECHES_BYUI) {
+            new ContentOption("byui", "BYU-Idaho Speeches", Folders.SPEECHES_BYUI) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new ByuiSpeechesScraper(driver);
@@ -102,7 +102,7 @@ public final class Scrape {
                     return new GeneralConferenceScraper(driver);
                 }
             },
-            new ContentOption("jtc", "Jesus the Christ Chapters", Folders.BOOKS_JESUS_THE_CHRIST) {
+            new ContentOption("jtc", "Jesus the Christ - Talmage", Folders.BOOKS_JESUS_THE_CHRIST) {
                 @Override
                 Scraper newInstance(WebDriver driver) {
                     return new JesusTheChristScraper(driver);

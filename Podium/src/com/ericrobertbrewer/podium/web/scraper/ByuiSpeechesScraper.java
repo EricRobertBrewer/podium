@@ -25,12 +25,30 @@ public class ByuiSpeechesScraper extends Scraper {
 
     /**
      * A collection of speeches whose formatting will be more easily manually added than automatically parsed
-     * because of [really] funky formatting.
+     * because of [really] funky or downright inconsistent formatting.
      * Files will be created for these speeches, but they will be blank.
      */
     @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
     private static final Set<String> BLACKLIST_TRANSCRIPT_URLS = new HashSet<>();
     static {
+        // 2017
+        // The last link is missing.
+        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/sister-rosemary-m-wixom");
+        // The first link is misplaced.
+        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/doug-watson");
+        // The "End Notes" at the beginning of the notes is exceptional.
+        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/david-r-peck");
+        // The "Scriptures Referenced" at the beginning of the notes is a nuisance.
+        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/reed-hendricks");
+        // She puts "References:" at the beginning of her notes.
+        // I don't want to break any future transcripts by skipping the element...
+        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/gwenaelle-couliard");
+        // Same as above.
+        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/susan-grant");
+        // References aren't numbered at all.
+        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/david-belka");
+        // Reference paragraph starts with `<strong>Notes</strong>`.
+        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/sheila-wener");
     }
 
     public ByuiSpeechesScraper(WebDriver driver) {
@@ -251,7 +269,6 @@ public class ByuiSpeechesScraper extends Scraper {
             }
         } else if (transcriptUrl.startsWith("http://www.byui.edu/Presentations/Transcripts")) {
             // This is a transcript from roughly before 2013.
-            System.out.println("Scraping speech `" + title + "`.");
             getDriver().navigate().to(transcriptUrl);
             // Save the page source.
             sourceFileName = fileNameBase + ".html";
@@ -335,24 +352,25 @@ public class ByuiSpeechesScraper extends Scraper {
 
     private static class ModernSpeechParser {
 
-        boolean hasReachedNotes = false;
+        private boolean hasReachedNotes = false;
         /**
          * This will be set the first time the notes format is detected.
          * It is assumed that the notes format will never change within a speech.
          */
-        NotesFormat notesFormat = null;
+        private NotesFormat notesFormat = null;
         /**
          * Used only when the notes format is a plain digit.
          */
-        int currentNote = 1;
+        private int currentNote = 1;
 
         ModernSpeechParser() {
         }
 
-        enum NotesFormat {
+        private enum NotesFormat {
             BRACKETED_DIGIT_LINK,
             BRACKETED_ROMAN_LOWERCASE_LINK,
             DIGIT_LINK,
+            BRACKETED_MSO_DIGIT_LINK,
             BRACKETED_DIGIT,
             BRACKETED_ROMAN_LOWERCASE,
             DIGIT
@@ -368,185 +386,25 @@ public class ByuiSpeechesScraper extends Scraper {
                 }
             } else {
                 // Write this element, which has no relevant inner elements.
-                final String html = element.getAttribute("innerHTML").trim();
+                final String html = element.getAttribute("innerHTML")
+                        .replace("&nbsp;", " ")
+                        .replace("&amp;", "&")
+                        .trim();
                 // Skip blank paragraphs.
                 if (html.length() == 0) {
                     return;
                 }
                 if (!hasReachedNotes) {
-                    // Split paragraphs by one or more line breaks.
-                    // Line breaks (`<br>`s) are sometimes wrapped in formatting tags.
-                    // See `http://www.byui.edu/speeches/bishop-w-christopher-waddell`.
-                    final String[] htmlParts = html
-                            .split("(?:<br */?>|<sup><br */?></sup>|<strong><br */?></strong>|<em><br */?></em>)+");
-                    for (String htmlPart : htmlParts) {
-                        htmlPart = htmlPart.trim();
-                        // Check whether or not this paragraph part is a header.
-                        // We assume that it's a header if it's entirely bold or italicized.
-                        if (isInSingleTag(htmlPart, "strong") ||
-                                isInSingleTag(htmlPart, "em") ||
-                                isInSingleTag(htmlPart, "b")) {
-                            writeTextIfNotEmpty(htmlPart, out, Encoding.HEADER_START, Encoding.HEADER_END);
-                        } else {
-                            writeTextIfNotEmpty(htmlPart, out);
-                        }
-                    }
+                    writeElementText(element, html, out);
                 } else {
                     // We are reading the notes section.
-                    final String decodedHtml = html
-                            .replaceAll("</?(?:sup|strong|em)>", "")
-                            .replaceAll("&nbsp;", " ")
-                            .trim();
-                    if (decodedHtml.length() == 0) {
-                        return;
-                    }
-                    // Check for a note header.
-                    // See `http://www.byui.edu/devotionals/elder-anthony-d-perkins`.
-                    final String text = element.getText().trim();
-                    if ("End Notes".equalsIgnoreCase(text)) {
-                        return;
-                    }
-                    // Notes can be clumped into one giant paragraph `<p>`.
-                    // This placeholder is used to replace expressions and split separate notes in the same paragraph.
-                    final String noteSplitPlaceholder = "__NOTE_START__";
-                    // Determine the note formatting.
-                    if (notesFormat == NotesFormat.BRACKETED_DIGIT_LINK ||
-                            notesFormat == NotesFormat.DIGIT_LINK ||
-                            html.startsWith("<a ")) {
-                        // The notes are hyperlinks.
-                        // Check the formatting of the reference numbers.
-                        if (notesFormat == NotesFormat.BRACKETED_DIGIT_LINK ||
-                                text.startsWith("[1]")) {
-                            notesFormat = NotesFormat.BRACKETED_DIGIT_LINK;
-                            // The reference numbers are hyperlinked digits within square brackets.
-                            // See `http://www.byui.edu/devotionals/rich-llewellyn`.
-                            final String[] htmlNotes = html
-                                    .replaceAll("(?: |&nbsp;)*<a .*?>(?:<span.*?>)?\\[([0-9]+)](?:</span>)?</a>(?: |&nbsp;)*", noteSplitPlaceholder + "$1|")
-                                    .split(noteSplitPlaceholder);
-                            for (String htmlNote : htmlNotes) {
-                                if (htmlNote.length() == 0) {
-                                    continue;
-                                }
-                                final String[] parts = htmlNote.trim().split("\\|");
-                                if (parts.length != 2) {
-                                    throw new RuntimeException("Unrecognized bracketed digit link note format: `" + htmlNote + "`.");
-                                }
-                                writeNote(notesOut, parts);
-                            }
-                        } else if (notesFormat == NotesFormat.DIGIT_LINK ||
-                                text.startsWith("1.")) {
-                            notesFormat = NotesFormat.DIGIT_LINK;
-                            // The reference numbers are hyperlinked digits followed by a period.
-                            // See `http://www.byui.edu/devotionals/president-kim-b-clark-winter-2014`.
-                            final String[] htmlNotes = html
-                                    .replaceAll("(?: |&nbsp;)*<a .*?>([0-9]+)</a>\\.?(?: |&nbsp;)*", noteSplitPlaceholder + "$1|")
-                                    .split(noteSplitPlaceholder);
-                            for (String htmlNote : htmlNotes) {
-                                if (htmlNote.length() == 0) {
-                                    continue;
-                                }
-                                final String[] parts = htmlNote.trim().split("\\|");
-                                if (parts.length != 2) {
-                                    throw new RuntimeException("Unrecognized digit link note format: `" + htmlNote + "`.");
-                                }
-                                writeNote(notesOut, parts);
-                            }
-                        } else if (notesFormat == NotesFormat.BRACKETED_ROMAN_LOWERCASE_LINK ||
-                                text.startsWith("[i]")) {
-                            notesFormat = NotesFormat.BRACKETED_ROMAN_LOWERCASE_LINK;
-                            // Lowercase Roman numerals, bracketed links.
-                            // See `http://www.byui.edu/devotionals/tim-rarick#_edn1`.
-                            // Assume that there is always a link, but that a `<span>` is optional.
-                            final String[] htmlNotes = html
-                                    .replaceAll("(?: |&nbsp;)*<a .*?>(?:<span.*?>)?\\[([ivx]+)](?:</span>)?</a>(?: |&nbsp;)*", noteSplitPlaceholder + "$1|")
-                                    .split(noteSplitPlaceholder);
-                            for (String htmlNote : htmlNotes) {
-                                if (htmlNote.length() == 0) {
-                                    continue;
-                                }
-                                final String[] parts = htmlNote.trim().split("\\|");
-                                if (parts.length != 2) {
-                                    throw new RuntimeException("Unrecognized bracketed lowercase Roman numeral note format: `" + htmlNote + "`.");
-                                }
-                                writeNote(notesOut, parts);
-                            }
-                        } else {
-                            throw new RuntimeException("Unrecognized link notes format: `" + html + "`.");
-                        }
-                    } else if (notesFormat == NotesFormat.BRACKETED_DIGIT ||
-                            text.startsWith("[1]")) {
-                        notesFormat = NotesFormat.BRACKETED_DIGIT;
-                        // The notes are not hyperlinks, in square brackets.
-                        // Optionally allow a `<span>` element to surround the brackets.
-                        // See `http://www.byui.edu/devotionals/kyoung-dabell`.
-                        final String[] htmlNotes = html
-                                .replaceAll("(?: |&nbsp;)*(?:<span.*?>)?\\[([0-9]+)](?:</span>)?(?: |&nbsp;)*", noteSplitPlaceholder + "$1|")
-                                .split(noteSplitPlaceholder);
-                        for (String htmlNote : htmlNotes) {
-                            if (htmlNote.length() == 0) {
-                                continue;
-                            }
-                            final String[] parts = htmlNote.trim().split("\\|");
-                            if (parts.length != 2) {
-                                throw new RuntimeException("Unrecognized bracketed digit note format: `" + htmlNote + "`.");
-                            }
-                            writeNote(notesOut, parts);
-                        }
-                    } else if (notesFormat == NotesFormat.BRACKETED_ROMAN_LOWERCASE ||
-                            text.startsWith("[i]")) {
-                        notesFormat = NotesFormat.BRACKETED_ROMAN_LOWERCASE;
-                        // Lowercase Roman numerals in brackets.
-                        // See `http://www.byui.edu/devotionals/president-eyring-winter-2018`.
-                        // The speech may intersperse hyperlinks, as in the above example ([ix]).
-                        final String[] htmlNotes = html
-                                .replaceAll("(?: |&nbsp;)*(?:<a .*?>)?(?:<span.*?>)?\\[([ivx]+)](?:</span>)?(?:</a>)?(?: |&nbsp;)*", noteSplitPlaceholder + "$1|")
-                                .split(noteSplitPlaceholder);
-                        for (String htmlNote : htmlNotes) {
-                            if (htmlNote.length() == 0) {
-                                continue;
-                            }
-                            final String[] parts = htmlNote.trim().split("\\|");
-                            if (parts.length != 2) {
-                                throw new RuntimeException("Unrecognized bracketed lowercase Roman numeral note format: `" + htmlNote + "`.");
-                            }
-                            writeNote(notesOut, parts);
-                        }
-                    } else if (notesFormat == NotesFormat.DIGIT ||
-                            // Using `html` instead of `text` here because we assume that there is no surrounding `<span>`.
-                            html.startsWith("1.")) {
-                        notesFormat = NotesFormat.DIGIT;
-                        // The reference numbers are not hyperlinks, nor within square brackets.
-                        // See `http://www.byui.edu/devotionals/president-clark-g-and-sister-christine-c-gilbert`.
-                        // Search the text iteratively for note reference numbers in ascending order.
-                        int currentIndex = 0;
-                        final String dotSpace = ". ";
-                        while (true) {
-                            final String sub = html.substring(currentIndex);
-                            final String[] parts = new String[2];
-                            // Extract the id number.
-                            final int dotSpaceIndex = sub.indexOf(dotSpace);
-                            parts[0] = sub.substring(0, dotSpaceIndex);
-                            // Extract the note up to the start of the next id, or the end of the paragraph.
-                            final int nextIndex = sub.indexOf("" + (currentNote + 1) + dotSpace);
-                            if (nextIndex == -1) {
-                                parts[1] = sub.substring(dotSpaceIndex + dotSpace.length());
-                                writeNote(notesOut, parts);
-                                break;
-                            }
-                            parts[1] = sub.substring(dotSpaceIndex + dotSpace.length(), nextIndex);
-                            writeNote(notesOut, parts);
-                            // Index is additive because substring is taken from `pHtml` (`pHtml` is not mutated).
-                            currentNote++;
-                            currentIndex += nextIndex;
-                        }
-                    } else {
-                        System.err.println("Unrecognized notes format: `" + html + "`.");
-                    }
+                    writeElementNote(element, html, notesOut);
                 }
             }
         }
 
-        void writeChildElement(WebElement child, PrintStream out, PrintStream notesOut) {
+        @SuppressWarnings("StatementWithEmptyBody")
+        private void writeChildElement(WebElement child, PrintStream out, PrintStream notesOut) {
             final String tag = child.getTagName();
             if ("p".equals(tag)) {
                 writeChildElementsOrSelf(child, out, notesOut);
@@ -560,12 +418,235 @@ public class ByuiSpeechesScraper extends Scraper {
                 writeChildElementsOrSelf(child, out, notesOut);
             } else if ("div".equals(tag)) {
                 writeChildElementsOrSelf(child, out, notesOut);
+            } else if ("table".equals(tag)) {
+                // See `http://www.byui.edu/devotionals/elder-neil-l-andersen-winter-2017`.
+                // The information in the example above is repeated in the text, so it's unnecessary to interpret it.
+            } else if ("style".equals(tag)) {
+                // Skip it.
+                // See `http://www.byui.edu/speeches/elder-l-whitney-clayton-winter-commencement-2017`.
+            } else if ("ins".equals(tag)) {
+                // Skip it.
+                // See `http://www.byui.edu/devotionals/paul-edwards`.
+            } else if ("h4".equals(tag)) {
+                // As far as I've seen, these seem safe to just write.
+                // See `http://www.byui.edu/devotionals/elder-ronald-a-rasband-convocation-winter-2016`.
+                writeChildElementsOrSelf(child, out, notesOut);
             } else {
                 System.err.println("Unrecognized HTML tag: `" + tag + "`.");
             }
         }
 
-        static final Set<String> FORMATTING_TAGS = new HashSet<>();
+        private void writeElementText(@SuppressWarnings("unused") WebElement element, String html, PrintStream out) {
+            // Split paragraphs by one or more line breaks.
+            // Line breaks (`<br>`s) are sometimes wrapped in formatting tags.
+            // See `http://www.byui.edu/speeches/bishop-w-christopher-waddell`.
+            final String[] htmlParts = html
+                    .split("(?:<br\\s*/?>|<sup><br\\s*/?></sup>|<strong><br\\s*/?></strong>|<em><br\\s*/?></em>)+");
+            for (int i = 0; i < htmlParts.length; i++) {
+                final String htmlPart = htmlParts[i].trim();
+                // Sometimes a `<br>` is inside of a header.
+                // See `http://www.byui.edu/devotionals/bonnie-moon`.
+                // For this reason, pass the next HTML part to the method, too.
+                final String nextPart = i + 1 < htmlParts.length ? htmlParts[i + 1].trim() : null;
+                // Check whether or not this paragraph part is a header.
+                // We assume that it's a header if it's entirely bold or italicized.
+                if (isInSingleTag(htmlPart, "strong", nextPart) ||
+                        isInSingleTag(htmlPart, "em", nextPart) ||
+                        isInSingleTag(htmlPart, "b", nextPart) ||
+                        isInSingleTag(htmlPart, "<span style=\"text-decoration: underline;\">")) {
+                    writeTextIfNotEmpty(htmlPart, out, Encoding.HEADER_START, Encoding.HEADER_END);
+                } else {
+                    writeTextIfNotEmpty(htmlPart, out);
+                }
+            }
+        }
+
+        private void writeElementNote(WebElement element, String html, PrintStream notesOut) {
+            final String text = element.getText().trim();
+            // Skip functionally empty elements.
+            if (text.length() == 0) {
+                return;
+            }
+            // Check for a note header.
+            // See `http://www.byui.edu/devotionals/elder-anthony-d-perkins`.
+            if ("End Notes".equalsIgnoreCase(text) ||
+                    // See `http://www.byui.edu/devotionals/brother-mark-b-woodruff-commencement-spring-2016`.
+                    "Notes".equalsIgnoreCase(text)) {
+                return;
+            }
+            // Notes can be broken up by `<br>`s.
+            // See `http://www.byui.edu/devotionals/brother-mark-b-woodruff-commencement-spring-2016`.
+            final String[] htmlParts = html
+                    .split("(?:<br\\s*/?>|<sup><br\\s*/?></sup>|<strong><br\\s*/?></strong>|<em><br\\s*/?></em>)+");
+            for (String htmlPart : htmlParts) {
+                // Notes are often clumped into one giant paragraph `<p>`.
+                // This placeholder is used to replace expressions and split separate notes in the same paragraph.
+                final String noteSplitPlaceholder = "__NOTE_START__";
+                // Determine the note formatting.
+                if (notesFormat == NotesFormat.BRACKETED_DIGIT_LINK ||
+                        notesFormat == NotesFormat.DIGIT_LINK ||
+                        notesFormat == NotesFormat.BRACKETED_ROMAN_LOWERCASE_LINK ||
+                        notesFormat == NotesFormat.BRACKETED_MSO_DIGIT_LINK ||
+                        htmlPart.startsWith("<a ")) {
+                    // The notes are hyperlinks.
+                    // Check the formatting of the reference numbers.
+                    if (notesFormat == NotesFormat.BRACKETED_DIGIT_LINK ||
+                            text.startsWith("[1]")) {
+                        notesFormat = NotesFormat.BRACKETED_DIGIT_LINK;
+                        // The reference numbers are (primarily) hyperlinked digits within square brackets.
+                        // See `http://www.byui.edu/devotionals/rich-llewellyn`.
+                        final String[] htmlNotes = htmlPart
+                                .replaceAll("\\s*<a\\s[^>]*?>\\s*<span[^>]*?>\\s*\\[([0-9]+)]\\s*</span>\\s*</a>\\s*", noteSplitPlaceholder + "$1|")
+                                .replaceAll("\\s*<a\\s[^>]*?>\\s*\\[([0-9]+)]\\s*</a>\\s*", noteSplitPlaceholder + "$1|")
+                                .split(noteSplitPlaceholder);
+                        for (String htmlNote : htmlNotes) {
+                            if (htmlNote.length() == 0) {
+                                continue;
+                            }
+                            final String[] parts = htmlNote.trim().split("\\|");
+                            if (parts.length != 2) {
+                                throw new RuntimeException("Unrecognized bracketed digit link note format: `" + htmlNote + "`.");
+                            }
+                            writeNote(notesOut, parts);
+                        }
+                    } else if (notesFormat == NotesFormat.DIGIT_LINK ||
+                            text.startsWith("1.")) {
+                        notesFormat = NotesFormat.DIGIT_LINK;
+                        // The reference numbers are hyperlinked digits followed by a period.
+                        // See `http://www.byui.edu/devotionals/president-kim-b-clark-winter-2014`.
+                        final String[] htmlNotes = htmlPart
+                                .replaceAll("\\s*<a\\s[^>]*?>([0-9]+)</a>\\.?\\s*", noteSplitPlaceholder + "$1|")
+                                .split(noteSplitPlaceholder);
+                        for (String htmlNote : htmlNotes) {
+                            if (htmlNote.length() == 0) {
+                                continue;
+                            }
+                            final String[] parts = htmlNote.trim().split("\\|");
+                            if (parts.length != 2) {
+                                throw new RuntimeException("Unrecognized digit link note format: `" + htmlNote + "`.");
+                            }
+                            writeNote(notesOut, parts);
+                        }
+                    } else if (notesFormat == NotesFormat.BRACKETED_ROMAN_LOWERCASE_LINK ||
+                            text.startsWith("[i]")) {
+                        notesFormat = NotesFormat.BRACKETED_ROMAN_LOWERCASE_LINK;
+                        // Lowercase Roman numerals, bracketed links.
+                        // See `http://www.byui.edu/devotionals/tim-rarick`.
+                        final String[] htmlNotes = htmlPart
+                                .replaceAll("\\s*<a\\s[^>]*?>\\s*<span[^>]*?>\\s*\\[([ivx]+)]\\s*</span>\\s*</a>\\s*", noteSplitPlaceholder + "$1|")
+                                .replaceAll("\\s*<a\\s[^>]*?>\\s*\\[([ivx]+)]\\s*</a>\\s*", noteSplitPlaceholder + "$1|")
+                                .split(noteSplitPlaceholder);
+                        for (String htmlNote : htmlNotes) {
+                            if (htmlNote.length() == 0) {
+                                continue;
+                            }
+                            final String[] parts = htmlNote.trim().split("\\|");
+                            if (parts.length != 2) {
+                                throw new RuntimeException("Unrecognized bracketed lowercase Roman numeral link note format: `" + htmlNote + "`.");
+                            }
+                            writeNote(notesOut, parts);
+                        }
+                    } else if (notesFormat == NotesFormat.BRACKETED_MSO_DIGIT_LINK ||
+                            text.startsWith("[M1]")) {
+                        notesFormat = NotesFormat.BRACKETED_MSO_DIGIT_LINK;
+                        // The reference numbers are hyperlinked digits preceded by an uppercase `M` within square brackets.
+                        // See `http://www.byui.edu/devotionals/jeff-morrin`.
+                        final String[] htmlNotes = htmlPart
+                                .replaceAll("\\s*<a [^>]*?>\\s*<span[^>]*?>\\s*\\[(M[0-9]+)]\\s*</span>\\s*</a>\\s*", noteSplitPlaceholder + "$1|")
+                                .replaceAll("\\s*<a [^>]*?>\\s*\\[(M[0-9]+)]\\s*</a>\\s*", noteSplitPlaceholder + "$1|")
+                                .split(noteSplitPlaceholder);
+                        for (String htmlNote : htmlNotes) {
+                            if (htmlNote.length() == 0) {
+                                continue;
+                            }
+                            final String[] parts = htmlNote.trim().split("\\|");
+                            if (parts.length != 2) {
+                                throw new RuntimeException("Unrecognized bracketed MSO digit link note format: `" + htmlNote + "`.");
+                            }
+                            writeNote(notesOut, parts);
+                        }
+                    } else {
+                        throw new RuntimeException("Unrecognized link notes format: `" + htmlPart + "`.");
+                    }
+                } else if (notesFormat == NotesFormat.BRACKETED_DIGIT ||
+                        text.startsWith("[1]")) {
+                    notesFormat = NotesFormat.BRACKETED_DIGIT;
+                    // The notes are not hyperlinks, in square brackets.
+                    final String[] htmlNotes = htmlPart
+                            // Exception for enclosing `<span>`s, such as: `http://www.byui.edu/devotionals/kyoung-dabell`.
+                            .replaceAll("\\s*<span[^>]*?>\\s*\\[([0-9]+)]\\s*</span>\\s*", noteSplitPlaceholder + "$1|")
+                            // Exception for `http://www.byui.edu/devotionals/president-gilbert`.
+                            .replaceAll("\\s*<sup[^>]*?>\\s*\\[([0-9]+)]\\s*</sup>\\s*", noteSplitPlaceholder + "$1|")
+                            // The general case.
+                            .replaceAll("\\s*\\[([0-9]+)]\\s*", noteSplitPlaceholder + "$1|")
+                            .split(noteSplitPlaceholder);
+                    for (String htmlNote : htmlNotes) {
+                        if (htmlNote.length() == 0) {
+                            continue;
+                        }
+                        final String[] parts = htmlNote.trim().split("\\|");
+                        if (parts.length != 2) {
+                            throw new RuntimeException("Unrecognized bracketed digit note format: `" + htmlNote + "`.");
+                        }
+                        writeNote(notesOut, parts);
+                    }
+                } else if (notesFormat == NotesFormat.BRACKETED_ROMAN_LOWERCASE ||
+                        text.startsWith("[i]")) {
+                    notesFormat = NotesFormat.BRACKETED_ROMAN_LOWERCASE;
+                    // Lowercase Roman numerals in brackets.
+                    // See `http://www.byui.edu/devotionals/president-eyring-winter-2018`.
+                    // The speech may intersperse hyperlinks, as in the above example ([ix]).
+                    final String[] htmlNotes = htmlPart
+                            .replaceAll("\\s*<a\\s[^>]*?>\\s*<span[^>]*?>\\s*\\[([ivx]+)]\\s*</span>\\s*</a>\\s*", noteSplitPlaceholder + "$1|")
+                            .replaceAll("\\s*<a\\s[^>]*?>\\s*\\[([ivx]+)]\\s*</a>\\s*", noteSplitPlaceholder + "$1|")
+                            .replaceAll("\\s*<span[^>]*?>\\s*\\[([ivx]+)]\\s*</span>\\s*", noteSplitPlaceholder + "$1|")
+                            .replaceAll("\\s*\\[([ivx]+)]\\s*", noteSplitPlaceholder + "$1|")
+                            .split(noteSplitPlaceholder);
+                    for (String htmlNote : htmlNotes) {
+                        if (htmlNote.length() == 0) {
+                            continue;
+                        }
+                        final String[] parts = htmlNote.trim().split("\\|");
+                        if (parts.length != 2) {
+                            throw new RuntimeException("Unrecognized bracketed lowercase Roman numeral note format: `" + htmlNote + "`.");
+                        }
+                        writeNote(notesOut, parts);
+                    }
+                } else if (notesFormat == NotesFormat.DIGIT ||
+                        // Using `html` instead of `text` here because we assume that there is no surrounding `<span>`.
+                        htmlPart.startsWith("1.")) {
+                    notesFormat = NotesFormat.DIGIT;
+                    // The reference numbers are not hyperlinks, nor within square brackets.
+                    // See `http://www.byui.edu/devotionals/president-clark-g-and-sister-christine-c-gilbert`.
+                    // Search the text iteratively for note reference numbers in ascending order.
+                    int currentIndex = 0;
+                    final String dotSpace = ". ";
+                    while (true) {
+                        final String sub = htmlPart.substring(currentIndex);
+                        final String[] parts = new String[2];
+                        // Extract the id number.
+                        final int dotSpaceIndex = sub.indexOf(dotSpace);
+                        parts[0] = sub.substring(0, dotSpaceIndex);
+                        // Extract the note up to the start of the next id, or the end of the paragraph.
+                        final int nextIndex = sub.indexOf("" + (currentNote + 1) + dotSpace);
+                        if (nextIndex == -1) {
+                            parts[1] = sub.substring(dotSpaceIndex + dotSpace.length());
+                            writeNote(notesOut, parts);
+                            break;
+                        }
+                        parts[1] = sub.substring(dotSpaceIndex + dotSpace.length(), nextIndex);
+                        writeNote(notesOut, parts);
+                        // Index is additive because substring is taken from `pHtml` (`pHtml` is not mutated).
+                        currentNote++;
+                        currentIndex += nextIndex;
+                    }
+                } else {
+                    System.err.println("Unrecognized notes format: `" + htmlPart + "`.");
+                }
+            }
+        }
+
+        private static final Set<String> FORMATTING_TAGS = new HashSet<>();
         static {
             FORMATTING_TAGS.add("b");
             FORMATTING_TAGS.add("i");
@@ -583,9 +664,10 @@ public class ByuiSpeechesScraper extends Scraper {
             // These seem to always accompany `<sup>` tags.
             FORMATTING_TAGS.add("span");
             FORMATTING_TAGS.add("sub");
+            FORMATTING_TAGS.add("ins");
         }
 
-        boolean areAllFormatting(List<WebElement> elements) {
+        private boolean areAllFormatting(List<WebElement> elements) {
             for (WebElement element : elements) {
                 final String tagName = element.getTagName();
                 if (!FORMATTING_TAGS.contains(tagName)) {
@@ -615,6 +697,7 @@ public class ByuiSpeechesScraper extends Scraper {
             // See `http://www2.byui.edu/Presentations/Transcripts/Devotionals/2012_01_10_KimClark.htm`.
             final WebElement leftAreaDiv = DriverUtils.findElementOrNull(contentSectionDiv, By.className("leftAREA"));
             if (leftAreaDiv != null) {
+                System.out.println("Scraping thin speech `" + fileName + "`.");
                 final ThinSpeechParser parser = new ThinSpeechParser();
                 parser.writeChildElementsOrSelf(leftAreaDiv, out, notesOut);
             } else {
@@ -625,6 +708,7 @@ public class ByuiSpeechesScraper extends Scraper {
             // See `http://www2.byui.edu/Presentations/Transcripts/Devotionals/1999_01_05_Bednar.htm`.
             // Or possibly a wide page w/ navigation, serif font.
             // See `http://www2.byui.edu/Presentations/Transcripts/Devotionals/2002_01_08_Bednar.htm`.
+            System.out.println("Scraping wide speech `" + fileName + "`.");
             final WebElement body = getDriver().findElement(By.tagName("body"));
             final WideSpeechParser parser = new WideSpeechParser();
             parser.writeChildElementsOrSelf(body, out, notesOut);
@@ -638,8 +722,8 @@ public class ByuiSpeechesScraper extends Scraper {
 
     private static class ThinSpeechParser {
 
-        boolean hasReachedSpeech = false;
-        boolean hasReachedNotes = false;
+        private boolean hasReachedSpeech = false;
+        private boolean hasReachedNotes = false;
 
         ThinSpeechParser() {
         }
@@ -648,6 +732,7 @@ public class ByuiSpeechesScraper extends Scraper {
             writeChildElementsOrSelf(element, out, notesOut, "", "");
         }
 
+        @SuppressWarnings("StatementWithEmptyBody")
         void writeChildElementsOrSelf(WebElement element, PrintStream out, PrintStream notesOut, String start, String end) {
             final List<WebElement> children = element.findElements(By.xpath("./*"));
             if (children.size() > 0 && !areAllFormatting(children)) {
@@ -655,14 +740,23 @@ public class ByuiSpeechesScraper extends Scraper {
                     writeChildElement(child, out, notesOut, start, end);
                 }
             } else {
-                writeElementText(element, out, start, end);
+                if (!hasReachedSpeech) {
+                    // The check for an `<hr>` element should have already been done.
+                } else if (!hasReachedNotes) {
+                    // We are in the speech contents.
+                    writeElementText(element, out, start, end);
+                } else {
+                    // We are in the notes.
+                    writeElementNote(element, notesOut);
+                }
             }
         }
 
         @SuppressWarnings("StatementWithEmptyBody")
-        void writeChildElement(WebElement child, PrintStream out, PrintStream notesOut, String start, String end) {
+        private void writeChildElement(WebElement child, PrintStream out, PrintStream notesOut, String start, String end) {
             final String tag = child.getTagName();
             if ("hr".equals(tag)) {
+                // We have not yet reached the speech contents.
                 // A `<hr>` is assumed to separate the heading, speech content, and notes (if any).
                 if (!hasReachedSpeech) {
                     hasReachedSpeech = true;
@@ -672,55 +766,46 @@ public class ByuiSpeechesScraper extends Scraper {
                     System.err.println("Extra <hr> element found.");
                 }
             } else if ("p".equals(tag)) {
-                if (!hasReachedSpeech) {
-                    // Ignore text in the heading.
-                } else if (!hasReachedNotes) {
-                    // Write the text.
-                    final String pHtml = child.getAttribute("innerHTML");
-                    if (isInSingleTag(pHtml, "strong") ||
-                            isInSingleTag(pHtml, "em")) {
-                        writeTextIfNotEmpty(pHtml, out, Encoding.HEADER_START, Encoding.HEADER_END);
-                    } else {
-                        writeTextIfNotEmpty(pHtml, out);
-                    }
-                } else {
-                    // Write the note.
-                    final String pHtml = child.getAttribute("innerHTML")
-                            .replaceAll("<sup>", "");
-                    final String[] parts = pHtml.split("</sup> *?");
-                    if (parts.length != 2) {
-                        throw new RuntimeException("Unrecognized note format: `" + pHtml + "`.");
-                    }
-                    writeNote(notesOut, parts);
-                }
+                writeChildElementsOrSelf(child, out, notesOut, start, end);
             } else if ("blockquote".equals(tag)) {
-                if (!hasReachedSpeech) {
-                } else if (!hasReachedNotes) {
-                    writeChildElementsOrSelf(child, out, notesOut, start, end);
-                } else {
-                    writeChildElementsOrSelf(child, out, notesOut, start, end);
-                }
+                writeChildElementsOrSelf(child, out, notesOut, start, end);
             } else if ("ul".equals(tag) ||
                     "ol".equals(tag)) {
-                if (!hasReachedSpeech) {
-                } else if (!hasReachedNotes) {
-                    writeChildElementsOrSelf(child, out, notesOut, start, end);
-                } else {
-                    writeChildElementsOrSelf(child, out, notesOut, start, end);
-                }
+                writeChildElementsOrSelf(child, out, notesOut, start, end);
             } else if ("li".equals(tag)) {
-                if (!hasReachedSpeech) {
-                } else if (!hasReachedNotes) {
-                    writeChildElementsOrSelf(child, out, notesOut, start, end);
-                } else {
-                    writeChildElementsOrSelf(child, out, notesOut, start, end);
-                }
+                writeChildElementsOrSelf(child, out, notesOut, start, end);
+            } else if ("div".equals(tag)) {
+                writeChildElementsOrSelf(child, out, notesOut, start, end);
             } else {
-                System.err.println("Unrecognized tag: `" + tag + "`.");
+                System.err.println("Unrecognized HTML tag: `" + tag + "`.");
             }
         }
 
-        static final Set<String> FORMATTING_TAGS = new HashSet<>();
+        private void writeElementText(WebElement child, PrintStream out, String start, String end) {
+            // Write the text.
+            final String pHtml = child.getAttribute("innerHTML");
+            if (isInSingleTag(pHtml, "strong") ||
+                    isInSingleTag(pHtml, "em") ||
+                    isInSingleTag(pHtml, "b")) {
+                writeTextIfNotEmpty(pHtml, out, Encoding.HEADER_START, Encoding.HEADER_END);
+            } else {
+                writeTextIfNotEmpty(pHtml, out, start, end);
+            }
+        }
+
+        private void writeElementNote(WebElement child, PrintStream notesOut) {
+            // Write the note.
+            final String pHtml = child.getAttribute("innerHTML")
+                    .replaceAll("<sup>", "")
+                    .trim();
+            final String[] parts = pHtml.split("</sup>\\s*?");
+            if (parts.length != 2) {
+                throw new RuntimeException("Unrecognized note format: `" + pHtml + "`.");
+            }
+            writeNote(notesOut, parts);
+        }
+
+        private static final Set<String> FORMATTING_TAGS = new HashSet<>();
         static {
             FORMATTING_TAGS.add("b");
             FORMATTING_TAGS.add("i");
@@ -731,7 +816,7 @@ public class ByuiSpeechesScraper extends Scraper {
             FORMATTING_TAGS.add("font");
         }
 
-        static boolean areAllFormatting(List<WebElement> elements) {
+        private static boolean areAllFormatting(List<WebElement> elements) {
             for (WebElement element : elements) {
                 final String tagName = element.getTagName();
                 if (!FORMATTING_TAGS.contains(tagName)) {
@@ -744,8 +829,8 @@ public class ByuiSpeechesScraper extends Scraper {
 
     private static class WideSpeechParser {
 
-        boolean hasReachedSpeech = false;
-        boolean hasReachedNotes = false;
+        private boolean hasReachedSpeech = false;
+        private boolean hasReachedNotes = false;
 
         WideSpeechParser() {
         }
@@ -769,7 +854,7 @@ public class ByuiSpeechesScraper extends Scraper {
         }
 
         @SuppressWarnings("StatementWithEmptyBody")
-        void writeChildElement(WebElement child, PrintStream out, PrintStream notesOut, String start, String end) {
+        private void writeChildElement(WebElement child, PrintStream out, PrintStream notesOut, String start, String end) {
             final String tag = child.getTagName();
             if ("hr".equals(tag)) {
                 if (!hasReachedSpeech) {
@@ -829,7 +914,7 @@ public class ByuiSpeechesScraper extends Scraper {
             }
         }
 
-        static final Set<String> FORMATTING_TAGS = new HashSet<>();
+        private static final Set<String> FORMATTING_TAGS = new HashSet<>();
         static {
             FORMATTING_TAGS.add("b");
             FORMATTING_TAGS.add("i");
@@ -840,7 +925,7 @@ public class ByuiSpeechesScraper extends Scraper {
             FORMATTING_TAGS.add("font");
         }
 
-        static boolean areAllFormatting(List<WebElement> elements) {
+        private static boolean areAllFormatting(List<WebElement> elements) {
             for (WebElement element : elements) {
                 final String tagName = element.getTagName();
                 if (!FORMATTING_TAGS.contains(tagName)) {
@@ -850,7 +935,7 @@ public class ByuiSpeechesScraper extends Scraper {
             return true;
         }
 
-        static boolean isDate(String text) {
+        private static boolean isDate(String text) {
             return text.startsWith("January") ||
                     text.startsWith("February") ||
                     text.startsWith("March") ||
@@ -927,19 +1012,45 @@ public class ByuiSpeechesScraper extends Scraper {
     }
 
     private static boolean isInSingleTag(String html, String tag) {
-        final String start = "<" + tag + ">";
-        final String end = "</" + tag + ">";
-        return html.startsWith(start) &&
-                html.endsWith(end) &&
-                html.indexOf(end) == html.length() - end.length();
+        return isInSingleTag(html, tag, null);
     }
 
-    private static void writeElementText(WebElement element, PrintStream out) {
-        writeElementText(element, out, "", "");
+    private static boolean isInSingleTag(String html, String tag, String nextHtml) {
+        final String start;
+        // Check if the start tag includes attribute values.
+        if (tag.startsWith("<") && tag.endsWith(">")) {
+            start = tag;
+        } else {
+            start = "<" + tag + ">";
+        }
+        // Fail if the HTML does not start with the given tag.
+        if (!html.startsWith(start)) {
+            return false;
+        }
+        // Check for the HTML ending with the same end tag.
+        final String end;
+        if (tag.startsWith("<") && tag.endsWith(">")) {
+            final int spaceIndex = tag.indexOf(" ");
+            if (spaceIndex != -1) {
+                end = "</" + tag.substring(1, spaceIndex) + ">";
+            } else {
+                end = "</" + tag.substring(1);
+            }
+        } else {
+            end = "</" + tag + ">";
+        }
+        // Check for the HTML ending with the end tag AND it is the only end tag of its kind.
+        if (html.endsWith(end) && html.indexOf(end) == html.length() - end.length()) {
+            return true;
+        }
+        // Check for the absence of the end tag in the current HTML and
+        // the following HTML starting with the end tag.
+        // This occurs in the first line in: `http://www.byui.edu/devotionals/bonnie-moon`.
+        return !html.contains(end) && nextHtml != null && nextHtml.startsWith(end);
     }
 
     private static void writeElementText(WebElement element, PrintStream out, String start, String end) {
-        final String html = element.getAttribute("innerHTML");
+        final String html = element.getAttribute("innerHTML").trim();
         writeTextIfNotEmpty(html, out, start, end);
     }
 
@@ -1000,7 +1111,7 @@ public class ByuiSpeechesScraper extends Scraper {
                 .replaceAll("&amp;", "&")
                 // Ignore all other known HTML formatting tags (links, italics, etc.).
 //                .replaceAll("<([-a-zA-Z0-9]+).*?>(.*?)</\\1>", "$2")
-                .replaceAll("(?<!<)</?(?:sup|strong|em|b|i|font|style|s|a|u|sub|g).*?>(?!>)", "")
+                .replaceAll("(?<!<)</?(?:sup|strong|em|b|i|font|style|s|a|u|sub|g|ins).*?>(?!>)", "")
                 // Ignore self-closing HTML tags.
                 .replaceAll("<[^>]+?/>", "")
                 // Ignore images (for now!!).
