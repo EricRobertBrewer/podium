@@ -1,7 +1,7 @@
-package com.ericrobertbrewer.podium.web.scraper;
+package com.ericrobertbrewer.podium.scrape.scraper;
 
-import com.ericrobertbrewer.podium.web.DriverUtils;
-import com.ericrobertbrewer.podium.web.Encoding;
+import com.ericrobertbrewer.podium.scrape.DriverUtils;
+import com.ericrobertbrewer.podium.Encoding;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -77,7 +77,7 @@ public class GeneralConferenceScraper extends Scraper {
         // Each individual talk has a complete navigation pane (there is no page which only contains the list of talks).
         // For this reason, we do not save the page source for each conference root.
         // Create the program file. Write the column headers.
-        final File programFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(folder, "program.tsv");
+        final File programFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(folder, "program.tsv");
         final OutputStream programOutputStream = new FileOutputStream(programFile);
         final PrintStream programOut = new PrintStream(programOutputStream);
         programOut.println("title\tspeaker\trole\tkicker\ttext\treferences\turl\tsource");
@@ -241,7 +241,7 @@ public class GeneralConferenceScraper extends Scraper {
      * @throws IOException When I/O error occurs.
      */
     private void writeReferences(WebElement referencesSection, File conferenceFolder, String referencesFileName) throws IOException {
-        final File referencesFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(conferenceFolder, referencesFileName);
+        final File referencesFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(conferenceFolder, referencesFileName);
         final OutputStream outputStream = new FileOutputStream(referencesFile);
         final PrintStream out = new PrintStream(outputStream);
         // Print header.
@@ -291,7 +291,7 @@ public class GeneralConferenceScraper extends Scraper {
      * @throws IOException When I/O error occurs.
      */
     private void writeText(WebElement bodyBlockDiv, File conferenceFolder, String fileName) throws IOException {
-        final File file = com.ericrobertbrewer.podium.web.FileUtils.newFile(conferenceFolder, fileName);
+        final File file = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(conferenceFolder, fileName);
         final OutputStream outputStream = new FileOutputStream(file);
         final PrintStream out = new PrintStream(outputStream);
         // Get every top-level child of the `body-block` `div`.

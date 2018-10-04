@@ -1,4 +1,4 @@
-package com.ericrobertbrewer.podium.web;
+package com.ericrobertbrewer.podium.scrape;
 
 import java.io.File;
 import java.io.IOException;

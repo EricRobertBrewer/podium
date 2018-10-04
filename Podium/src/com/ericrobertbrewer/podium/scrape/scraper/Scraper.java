@@ -1,4 +1,4 @@
-package com.ericrobertbrewer.podium.web.scraper;
+package com.ericrobertbrewer.podium.scrape.scraper;
 
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.WebDriver;

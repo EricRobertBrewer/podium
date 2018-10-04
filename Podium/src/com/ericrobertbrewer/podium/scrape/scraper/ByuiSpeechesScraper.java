@@ -1,7 +1,7 @@
-package com.ericrobertbrewer.podium.web.scraper;
+package com.ericrobertbrewer.podium.scrape.scraper;
 
-import com.ericrobertbrewer.podium.web.DriverUtils;
-import com.ericrobertbrewer.podium.web.Encoding;
+import com.ericrobertbrewer.podium.scrape.DriverUtils;
+import com.ericrobertbrewer.podium.Encoding;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -31,24 +31,6 @@ public class ByuiSpeechesScraper extends Scraper {
     @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
     private static final Set<String> BLACKLIST_TRANSCRIPT_URLS = new HashSet<>();
     static {
-        // 2017
-        // The last link is missing.
-        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/sister-rosemary-m-wixom");
-        // The first link is misplaced.
-        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/doug-watson");
-        // The "End Notes" at the beginning of the notes is exceptional.
-        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/david-r-peck");
-        // The "Scriptures Referenced" at the beginning of the notes is a nuisance.
-        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/reed-hendricks");
-        // She puts "References:" at the beginning of her notes.
-        // I don't want to break any future transcripts by skipping the element...
-        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/gwenaelle-couliard");
-        // Same as above.
-        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/susan-grant");
-        // References aren't numbered at all.
-        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/david-belka");
-        // Reference paragraph starts with `<strong>Notes</strong>`.
-        BLACKLIST_TRANSCRIPT_URLS.add("http://www.byui.edu/devotionals/sheila-wener");
     }
 
     public ByuiSpeechesScraper(WebDriver driver) {
@@ -134,7 +116,7 @@ public class ByuiSpeechesScraper extends Scraper {
         final String sourceFileName = "year.html";
         writeSource(folder, sourceFileName, force);
         // Create the summary file. Write the column headers.
-        final File summaryFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(folder, "summary.tsv");
+        final File summaryFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(folder, "summary.tsv");
         final OutputStream summaryOutputStream = new FileOutputStream(summaryFile);
         final PrintStream summaryOut = new PrintStream(summaryOutputStream);
         summaryOut.println("title\tspeaker\tposition\tdate\ttype\ttranscript\tnotes\taudio\turl\tsource\taudio_url");
@@ -230,13 +212,13 @@ public class ByuiSpeechesScraper extends Scraper {
             // Create new blank files for this speech.
             fileName = fileNameBase + ".txt";
             try {
-                com.ericrobertbrewer.podium.web.FileUtils.newFile(yearFolder, fileName);
+                com.ericrobertbrewer.podium.scrape.FileUtils.newFile(yearFolder, fileName);
             } catch (IOException e) {
                 e.printStackTrace();
             }
             notesFileName = fileNameBase + "_notes.tsv";
             try {
-                com.ericrobertbrewer.podium.web.FileUtils.newFile(yearFolder, notesFileName);
+                com.ericrobertbrewer.podium.scrape.FileUtils.newFile(yearFolder, notesFileName);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -297,7 +279,7 @@ public class ByuiSpeechesScraper extends Scraper {
             audioFileName = fileNameBase + ".mp3";
             try {
                 System.out.println("Downloading audio file: `" + audioFileName + "`.");
-                final File audioFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(yearFolder, audioFileName);
+                final File audioFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(yearFolder, audioFileName);
                 FileUtils.copyURLToFile(new URL(audioUrl), audioFile);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -322,11 +304,11 @@ public class ByuiSpeechesScraper extends Scraper {
     private void writeTranscriptAndNotes2(WebElement transcriptTextDiv,
                                           File yearFolder, String fileName, String notesFileName) throws IOException {
         // Create the text file.
-        final File file = com.ericrobertbrewer.podium.web.FileUtils.newFile(yearFolder, fileName);
+        final File file = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(yearFolder, fileName);
         final OutputStream outputStream = new FileOutputStream(file);
         final PrintStream out = new PrintStream(outputStream);
         // Create the notes file.
-        final File notesFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(yearFolder, notesFileName);
+        final File notesFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(yearFolder, notesFileName);
         final OutputStream notesOutputStream = new FileOutputStream(notesFile);
         final PrintStream notesOut = new PrintStream(notesOutputStream);
         // Write the notes header.
@@ -680,11 +662,11 @@ public class ByuiSpeechesScraper extends Scraper {
 
     private void writeTranscriptAndNotes(File yearFolder, String fileName, String notesFileName) throws IOException {
         // Create the text file.
-        final File file = com.ericrobertbrewer.podium.web.FileUtils.newFile(yearFolder, fileName);
+        final File file = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(yearFolder, fileName);
         final OutputStream outputStream = new FileOutputStream(file);
         final PrintStream out = new PrintStream(outputStream);
         // Create the notes file.
-        final File notesFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(yearFolder, notesFileName);
+        final File notesFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(yearFolder, notesFileName);
         final OutputStream notesOutputStream = new FileOutputStream(notesFile);
         final PrintStream notesOut = new PrintStream(notesOutputStream);
         // Write the notes header.

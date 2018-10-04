@@ -1,7 +1,7 @@
-package com.ericrobertbrewer.podium.web.scraper;
+package com.ericrobertbrewer.podium.scrape.scraper;
 
-import com.ericrobertbrewer.podium.web.DriverUtils;
-import com.ericrobertbrewer.podium.web.Encoding;
+import com.ericrobertbrewer.podium.scrape.DriverUtils;
+import com.ericrobertbrewer.podium.Encoding;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -73,7 +73,7 @@ public class ByuSpeechesScraper extends Scraper {
         final String sourceFileName = "year.html";
         writeSource(folder, sourceFileName, force);
         // Create the summary file. Write the column headers.
-        final File summaryFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(folder, "summary.tsv");
+        final File summaryFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(folder, "summary.tsv");
         final OutputStream summaryOutputStream = new FileOutputStream(summaryFile);
         final PrintStream summaryOut = new PrintStream(summaryOutputStream);
         summaryOut.println("title\tspeaker\tposition\tdate\ttype\ttopics\ttext\tnotes\turl\tsource");
@@ -191,11 +191,11 @@ public class ByuSpeechesScraper extends Scraper {
     @SuppressWarnings("StringConcatenationInLoop")
     private String writeSpeechAndNotes(WebElement bodyDiv, File folder, String fileName, String notesFileName) throws IOException {
         // Create the speech file.
-        final File file = com.ericrobertbrewer.podium.web.FileUtils.newFile(folder, fileName);
+        final File file = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(folder, fileName);
         final OutputStream outputStream = new FileOutputStream(file);
         final PrintStream out = new PrintStream(outputStream);
         // Create the notes file.
-        final File notesFile = com.ericrobertbrewer.podium.web.FileUtils.newFile(folder, notesFileName);
+        final File notesFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(folder, notesFileName);
         final OutputStream notesOutputStream = new FileOutputStream(notesFile);
         final PrintStream notesOut = new PrintStream(notesOutputStream);
         notesOut.println("id\tnote");

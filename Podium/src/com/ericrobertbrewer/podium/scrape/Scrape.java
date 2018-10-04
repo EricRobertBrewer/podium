@@ -1,6 +1,7 @@
-package com.ericrobertbrewer.podium;
+package com.ericrobertbrewer.podium.scrape;
 
-import com.ericrobertbrewer.podium.web.scraper.*;
+import com.ericrobertbrewer.podium.Folders;
+import com.ericrobertbrewer.podium.scrape.scraper.*;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
