@@ -1,7 +1,7 @@
 package com.ericrobertbrewer.podium.scrape.scraper;
 
-import com.ericrobertbrewer.podium.scrape.DriverUtils;
 import com.ericrobertbrewer.podium.Encoding;
+import com.ericrobertbrewer.podium.scrape.DriverUtils;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -9,7 +9,6 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.Select;
 
 import java.io.*;
-import java.net.URL;
 import java.util.*;
 
 /**
@@ -119,7 +118,7 @@ public class ByuiSpeechesScraper extends Scraper {
         final File summaryFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(folder, "summary.tsv");
         final OutputStream summaryOutputStream = new FileOutputStream(summaryFile);
         final PrintStream summaryOut = new PrintStream(summaryOutputStream);
-        summaryOut.println("title\tspeaker\tposition\tdate\ttype\ttranscript\tnotes\taudio\turl\tsource\taudio_url");
+        summaryOut.println("title\tspeaker\tposition\tdate\ttype\ttranscript\tnotes\turl\tsource\taudio_url");
         // Extract title, speaker, position, date, type.
         final List<String> titles = new ArrayList<>();
         final List<String> speakers = new ArrayList<>();
@@ -191,7 +190,6 @@ public class ByuiSpeechesScraper extends Scraper {
                               PrintStream summaryOut) {
         final String fileName;
         final String notesFileName;
-        final String audioFileName;
         final String sourceFileName;
         // Extract the file name base as the date, speaker, and title.
         final String fileNameBase = (date + "_" + speaker + "_" + title).toLowerCase()
@@ -274,22 +272,9 @@ public class ByuiSpeechesScraper extends Scraper {
             notesFileName = "";
             sourceFileName = "";
         }
-        // Download the audio.
-        if (audioUrl.length() > 0) {
-            audioFileName = fileNameBase + ".mp3";
-            try {
-                System.out.println("Downloading audio file: `" + audioFileName + "`.");
-                final File audioFile = com.ericrobertbrewer.podium.scrape.FileUtils.newFile(yearFolder, audioFileName);
-                FileUtils.copyURLToFile(new URL(audioUrl), audioFile);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        } else {
-            audioFileName = "";
-        }
         // Add this speech's information to the summary.
         summaryOut.print(title + "\t" + speaker + "\t" + position + "\t" + date + "\t" + type);
-        summaryOut.print("\t" + fileName + "\t" + notesFileName + "\t" + audioFileName);
+        summaryOut.print("\t" + fileName + "\t" + notesFileName);
         summaryOut.print("\t" + transcriptUrl + "\t" + sourceFileName + "\t" + audioUrl);
         summaryOut.println();
     }
@@ -379,8 +364,14 @@ public class ByuiSpeechesScraper extends Scraper {
                 if (!hasReachedNotes) {
                     writeElementText(element, html, out);
                 } else {
-                    // We are reading the notes section.
-                    writeElementNote(element, html, notesOut);
+                    try {
+                        // We are reading the notes section.
+                        writeElementNote(element, html, notesOut);
+                    } catch (RuntimeException e) {
+                        // Move on. References aren't as important as transcripts.
+                        // Also, they tend to have a lot of inconsistencies.
+                        e.printStackTrace();
+                    }
                 }
             }
         }
@@ -413,6 +404,9 @@ public class ByuiSpeechesScraper extends Scraper {
                 // As far as I've seen, these seem safe to just write.
                 // See `http://www.byui.edu/devotionals/elder-ronald-a-rasband-convocation-winter-2016`.
                 writeChildElementsOrSelf(child, out, notesOut);
+            } else if ("iframe".equals(tag)) {
+                // Probably a video placeholder. Skip it.
+                // See `http://www.byui.edu/devotionals/troy-dougherty`.
             } else {
                 System.err.println("Unrecognized HTML tag: `" + tag + "`.");
             }
@@ -729,7 +723,12 @@ public class ByuiSpeechesScraper extends Scraper {
                     writeElementText(element, out, start, end);
                 } else {
                     // We are in the notes.
-                    writeElementNote(element, notesOut);
+                    try {
+                        writeElementNote(element, notesOut);
+                    } catch (RuntimeException e) {
+                        // Move on.
+                        e.printStackTrace();
+                    }
                 }
             }
         }
@@ -758,6 +757,13 @@ public class ByuiSpeechesScraper extends Scraper {
                 writeChildElementsOrSelf(child, out, notesOut, start, end);
             } else if ("div".equals(tag)) {
                 writeChildElementsOrSelf(child, out, notesOut, start, end);
+            } else if ("h2".equals(tag) || "h3".equals(tag) || "h4".equals(tag) || "h5".equals(tag) || "h6".equals(tag)) {
+                // See `http://www2.byui.edu/Presentations/Transcripts/Devotionals/2016_02_09_Pothier.htm`.
+                writeChildElementsOrSelf(child, out, notesOut, start, end);
+            } else if ("img".equals(tag)) {
+                // Ignore it.
+            } else if ("script".equals(tag)) {
+                // Useless. Ignore it.
             } else {
                 System.err.println("Unrecognized HTML tag: `" + tag + "`.");
             }
@@ -796,6 +802,9 @@ public class ByuiSpeechesScraper extends Scraper {
             FORMATTING_TAGS.add("a");
             FORMATTING_TAGS.add("sup");
             FORMATTING_TAGS.add("font");
+            // Not formatting, but are assumed to not contain relevant text.
+            FORMATTING_TAGS.add("img");
+            FORMATTING_TAGS.add("script");
         }
 
         private static boolean areAllFormatting(List<WebElement> elements) {
